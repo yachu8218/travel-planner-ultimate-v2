@@ -1,58 +1,44 @@
-# Travel Planner Ultimate 2.0 Final
+# Travel Planner Ultimate 2.1 — 第二步
 
-這是整理過的乾淨正式版，可直接上傳 GitHub 並由 Netlify 建置。
+這一版可直接覆蓋目前 GitHub Repository 內的同名檔案。
 
-## 正確的根目錄
+## 本次新增
 
-```text
-public/
-src/
-.gitignore
-index.html
-netlify.toml
-package.json
-package-lock.json
-README.md
-tsconfig.app.json
-tsconfig.json
-vite.config.ts
-VERSION.txt
-```
+- 每日行程改成 Day 1、Day 2、Day 3 分頁顯示
+- 前一天／後一天切換
+- 每日摘要：安排數、交通段數、通勤分鐘
+- 便條紙待辦功能強化
+- 交通方式下拉選單
+- 步行、地鐵、公車、計程車、自駕、火車／高鐵／KTX、飛機、渡輪
+- 出發地、抵達地、通勤時間、距離、路線／車次欄位
+- 飛機卡可先記錄航班號碼（即時航班搜尋在第三步）
+- 六種可設定主題，每趟旅行可使用不同主題
+- 主題會同步套用首頁卡片、行程、按鈕、便條與列印樣式
+- 舊版 2.0 的本機行程資料可繼續使用
 
-以下檔案不應上傳，也不會再由新版建置設定產生：
+## 六種主題
 
-```text
-*.tsbuildinfo
-vite.config.js
-vite.config.d.ts
-```
+1. 夏日陽光
+2. 復古手帳
+3. 櫻花旅行
+4. 森林療癒
+5. 海岸假期
+6. 灰紫信紙
 
-## GitHub 上傳
+## 更新 GitHub
 
 1. 解壓縮 ZIP。
-2. 打開解壓縮後的資料夾。
-3. `Ctrl + A` 全選資料夾內的內容。
-4. 將全部內容直接拖曳至 GitHub 的 Upload files 區域。
-5. 確認 GitHub 顯示 `src/...` 與 `public/...` 路徑後再 Commit。
+2. 打開解壓後的資料夾。
+3. `Ctrl + A` 全選裡面的內容。
+4. 拖進原本的 `travel-planner-ultimate-v2` Repository 的 Upload files。
+5. GitHub 會顯示同名檔案已更新。
+6. 按 Commit changes。
+7. Netlify 會自動重新部署。
+
+不需要建立新的 Repository，也不要刪除原本的旅行資料。
 
 ## Netlify
 
-```text
-Build command: npm run build
-Publish directory: dist
-Functions directory: 留空
-```
-
-專案已包含 `netlify.toml`，Netlify 通常會自動套用。
-
-## 目前核心功能
-
-- 多旅行 Dashboard
-- 新增、切換、編輯、複製及刪除旅行
-- 旅行封面
-- 獨立目的地、幣別及語言
-- 時間軸與便條紙
-- 一週天氣
-- 分享唯讀旅行
-- 列印／PDF
-- PWA 基礎功能
+- Build command：`npm run build`
+- Publish directory：`dist`
+- Functions directory：保持目前設定即可
