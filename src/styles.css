@@ -69,3 +69,82 @@ html,body{width:100%;max-width:100%;overflow-x:auto}
 .transport-card{margin:6px 0;padding:7px;border-width:1.5px}.transport-title span{font-size:18px}.transport-title strong{font-size:11px;padding:2px 6px}.route{margin:6px 0;gap:5px}.route span{padding:4px;font-size:11px}.transport-meta{gap:7px}.transport-meta span{font-size:10px}
 .checks label{padding:4px 0;font-size:12px}.checks input{width:17px;height:17px}.note-heading{margin:4px 0;font-size:11px}.item-actions{margin-top:7px;padding-top:6px;gap:4px}.item-actions button{padding:4px 6px;font-size:10px}.day-pager{margin-top:12px;padding-top:8px}.day-pager .btn{padding:7px 9px}
 @media(max-width:600px){.top{background:linear-gradient(90deg,var(--paper) 0%,var(--paper) 51%,color-mix(in srgb,var(--primary) 58%,var(--paper)) 51%,color-mix(in srgb,var(--primary) 58%,var(--paper)) 100%)}.item{grid-template-columns:56px 1fr}.time{font-size:12px}.body h3{font-size:16px}.item-actions button:nth-child(2){font-size:0}.item-actions button:nth-child(2) svg{margin:0}}
+
+
+/* v2.3.3：全站禁止橫向捲動、完整縮放與單一 Header */
+html,body,#root{width:100%;max-width:100%;overflow-x:hidden!important}
+body{touch-action:pan-y}
+.app{width:100%;max-width:980px;overflow:hidden!important;position:relative}
+.top{width:100%!important;min-width:0!important;left:auto!important;right:auto!important;background:color-mix(in srgb,var(--primary) 34%,var(--paper))!important;border-bottom:3px solid var(--ink);box-shadow:0 4px 0 var(--ink);overflow:hidden}
+.top::before,.top::after{display:none!important;content:none!important}
+.content,.page-with-nav,.wallet-center,.translate-center,.explore-center,.flight-center{width:100%;max-width:100%;min-width:0}
+.card,.control-grid,.control-card,.rate-card,.budget-card,.travelers-card,.settlement-card,.translator-card,.phrase-card,.quantity-card,.favorites-card,.expense-row,.place-result{max-width:100%;min-width:0}
+input,select,textarea,button{max-width:100%}
+/* 所有原本會橫向滑動的區塊改成自動換行 */
+.amount-shortcuts,.counter-tabs,.phrase-tabs,.day-summary,.day-tabs,.weather-row,.external-map-buttons{display:flex;flex-wrap:wrap;overflow:visible!important;max-width:100%;gap:6px}
+.amount-shortcuts button,.counter-tabs button,.phrase-tabs button{white-space:normal;flex:0 1 auto}
+.day-tabs button{min-width:0;flex:1 1 calc(33.333% - 6px);padding:8px}
+.weather-day{min-width:0;flex:1 1 calc(25% - 7px);padding:7px}
+/* 錢包完整塞入手機寬度 */
+.rate-grid{grid-template-columns:1fr!important;gap:8px}
+.rate-grid>div{grid-template-columns:minmax(0,1fr) 78px!important;min-width:0}
+.rate-grid input,.rate-grid select{min-width:0}
+.swap{margin:auto;transform:rotate(90deg)}
+.traveler-add{grid-template-columns:minmax(0,1fr) auto}
+.wallet-hero,.translate-hero{min-width:0}
+/* 數量表取消最小寬度，手機完整顯示 */
+.quantity-table-wrap{width:100%;max-width:100%;overflow:hidden!important}
+.quantity-table{width:100%;min-width:0!important;table-layout:fixed}
+.quantity-table th,.quantity-table td{padding:7px 6px;word-break:break-word;font-size:12px}
+.quantity-table th:nth-child(1),.quantity-table td:nth-child(1){width:22%}
+.quantity-table th:nth-child(2),.quantity-table td:nth-child(2){width:58%}
+.quantity-table th:nth-child(3),.quantity-table td:nth-child(3){width:20%;text-align:center}
+.quantity-table td:nth-child(2){font-size:15px}
+/* 翻譯句子不撐寬 */
+.phrase-list article,.favorite-row,.translated-box{min-width:0;overflow-wrap:anywhere}
+.phrase-list article>div:first-child,.favorite-row>div{min-width:0}
+.phrase-list p,.favorite-row p,.translated-box p{overflow-wrap:anywhere;word-break:break-word}
+/* 整體稍微縮小，一覽更多內容 */
+.content{padding:14px}
+.card{border-width:2px;box-shadow:4px 4px 0 var(--ink);border-radius:10px}
+.btn{border-width:2px;box-shadow:3px 3px 0 var(--ink);padding:8px 10px;font-size:13px}
+.icons button,.icon{width:36px;height:36px;border-width:2px;box-shadow:2px 2px 0 var(--ink)}
+.cover,.cover>div{min-height:185px}.cover h2{font-size:32px}
+.control-grid{gap:10px}.control-card{padding:12px;min-height:115px}
+.wallet-center,.translate-center{gap:12px}
+.rate-card,.budget-card,.travelers-card,.settlement-card,.translator-card,.phrase-card,.quantity-card,.favorites-card{padding:13px}
+.wallet-hero,.translate-hero{padding:14px}
+.translated-box p{font-size:18px;min-height:36px}
+.bottom-nav{max-width:100%;overflow:hidden}
+/* 行程維持緊湊版並避免任何溢出 */
+.item{grid-template-columns:54px minmax(0,1fr);gap:7px}
+.time{font-size:11px;padding:5px 3px}
+.body{min-width:0;padding:7px 8px}
+.body h3{font-size:15px}
+.route{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}
+.route span{min-width:0;overflow-wrap:anywhere}
+.item-actions{gap:3px}.item-actions button{padding:4px 5px;font-size:9px}
+@media(max-width:600px){
+ .app{border:0}
+ .top{padding:calc(8px + env(safe-area-inset-top)) 12px 10px}
+ .top h1{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:62vw}
+ .content{padding:11px}
+ .control-grid,.tools-grid{grid-template-columns:1fr}
+ .hero-control{grid-column:auto}
+ .wallet-hero,.translate-hero{display:grid}
+ .rate-grid>div{grid-template-columns:minmax(0,1fr) 72px!important}
+ .amount-shortcuts button{flex:1 1 calc(33.333% - 6px);padding:6px 4px;font-size:11px}
+ .counter-tabs button,.phrase-tabs button{font-size:11px;padding:6px 8px}
+ .day-tabs button{flex:1 1 calc(33.333% - 6px);font-size:11px}
+ .weather-day{flex:1 1 calc(25% - 6px);font-size:11px}
+ .weather-day:nth-child(n+5){display:none}
+ .traveler-add{grid-template-columns:1fr}
+ .traveler-add .btn{width:100%}
+ .expense-row{display:grid}
+ .expense-row>div:last-child{justify-items:start}
+ .phrase-list article{display:grid;gap:7px}
+ .phrase-list article>div:last-child{justify-content:flex-start}
+ .quantity-table th,.quantity-table td{padding:6px 4px;font-size:11px}
+ .quantity-table td:nth-child(2){font-size:13px}
+ .item{grid-template-columns:50px minmax(0,1fr)}
+}
