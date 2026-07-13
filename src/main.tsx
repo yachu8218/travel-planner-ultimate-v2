@@ -25,6 +25,8 @@ type Trip={
 }
 type State={version:2,active:string|null,trips:Trip[]}
 type WeatherDay={date:string,code:number,max:number,min:number,rain:number}
+type PlaceResult={place_id:string;display_name:string;lat:string;lon:string}
+type FlightResult={flightNo:string;airline?:string;status?:string;departure:{airport?:string;iata?:string;terminal?:string;gate?:string;scheduled?:string};arrival:{airport?:string;iata?:string;terminal?:string;gate?:string;baggage?:string;scheduled?:string};aircraft?:string;durationMin?:number;source?:string}
 
 const KEY='travel-planner-ultimate-v2'
 const WEATHER_KEY='travel-planner-weather-v22'
@@ -158,6 +160,29 @@ function Weather({trip,compact=false}:{trip:Trip,compact?:boolean}){
  </section>
 }
 
+
+const stations=[
+ ['釜山','1號線','釜山站','부산역','Busan Station'],['釜山','1號線','南浦','남포','Nampo'],['釜山','1號線','札嘎其','자갈치','Jagalchi'],['釜山','1號線','西面','서면','Seomyeon'],['釜山','2號線','海雲台','해운대','Haeundae'],['釜山','2號線','冬柏','동백','Dongbaek'],['釜山','2號線','廣安','광안','Gwangan'],['釜山','2號線','Centum City','센텀시티','Centum City'],['釜山','東海線','松亭','송정','Songjeong'],['釜山','東海線','機張','기장','Gijang'],['釜山','金海輕軌','金海機場','공항','Gimhae Airport'],['首爾','2號線','弘大入口','홍대입구','Hongik Univ.'],['首爾','4號線','明洞','명동','Myeong-dong'],['首爾','2號線','江南','강남','Gangnam'],['東京','JR','東京','東京','Tokyo'],['東京','JR','新宿','新宿','Shinjuku'],['東京','JR','澀谷','渋谷','Shibuya'],['東京','銀座線','淺草','浅草','Asakusa'],['大阪','御堂筋線','梅田','梅田','Umeda'],['大阪','御堂筋線','難波','なんば','Namba'],['京都','JR','京都','京都','Kyoto']
+] as const
+const stationSearch=(q:string)=>{const k=q.trim().toLowerCase();return k?stations.filter(s=>s.join(' ').toLowerCase().includes(k)).slice(0,20):[]}
+const gmap=(q:string)=>`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`
+const nmap=(q:string)=>`https://map.naver.com/p/search/${encodeURIComponent(q)}`
+const ftime=(s?:string)=>s?new Date(s).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—'
+
+function FlightCenter({trip,onAdd}:{trip:Trip,onAdd:(x:Item)=>void}){
+ const [no,setNo]=useState(''),[date,setDate]=useState(trip.start),[loading,setLoading]=useState(false),[msg,setMsg]=useState(''),[result,setResult]=useState<FlightResult|null>(null)
+ const search=async()=>{const f=no.trim().toUpperCase();if(!f){setMsg('請先輸入航班號碼。');return}setLoading(true);setMsg('');setResult(null);try{const r=await fetch(`/.netlify/functions/flight?flight=${encodeURIComponent(f)}&date=${encodeURIComponent(date)}`);const j=await r.json();if(!r.ok)throw new Error(j.message||'查詢失敗');setResult(j.flight)}catch(e:any){setMsg(e?.message||'目前無法取得航班資料，可改用手動建立。')}finally{setLoading(false)}}
+ const add=()=>{if(!result)return;const d=result.departure,a=result.arrival;onAdd({id:id(),type:'flight',start:(d.scheduled||'').slice(11,16)||'00:00',end:(a.scheduled||'').slice(11,16)||'00:00',title:`${result.flightNo} ${result.airline||'航班'}`,flightNo:result.flightNo,transportMode:'flight',from:[d.airport,d.iata,d.terminal&&`T${d.terminal}`].filter(Boolean).join(' '),to:[a.airport,a.iata,a.terminal&&`T${a.terminal}`].filter(Boolean).join(' '),durationMin:result.durationMin,note:[result.status&&`狀態：${result.status}`,result.aircraft&&`機型：${result.aircraft}`,d.gate&&`出發 Gate：${d.gate}`,a.baggage&&`行李轉盤：${a.baggage}`].filter(Boolean).join('\n')})}
+ return <section className="flight-center"><div className="card feature-card"><div className="feature-head"><div><small>FLIGHT SEARCH</small><h2>航班中心</h2></div><Plane size={30}/></div><p>輸入航班號與搭乘日期，查詢後可直接加入目前 Day。</p><div className="flight-fields"><label>航班號<input value={no} onChange={e=>setNo(e.target.value.toUpperCase())} placeholder="例如：KE2086"/></label><label>搭乘日期<input type="date" value={date} onChange={e=>setDate(e.target.value)}/></label></div><button className="btn primary full" onClick={search} disabled={loading}>{loading?<><RefreshCw className="spin" size={18}/>正在查詢</>:<><Search size={18}/>查詢航班</>}</button>{msg&&<div className="service-message">{msg}<small>即時航班需在 Netlify 設定 AVIATIONSTACK_API_KEY；尚未設定時仍可在行程中手動新增。</small></div>}</div>{result&&<article className="card flight-result"><div className="flight-result-head"><div><small>{result.airline||'AIRLINE'}</small><h2>{result.flightNo}</h2></div><span>{result.status||'已取得資料'}</span></div><div className="flight-route"><div><b>{result.departure.iata||'—'}</b><span>{result.departure.airport||'出發機場'}</span><strong>{ftime(result.departure.scheduled)}</strong><small>{result.departure.terminal?`Terminal ${result.departure.terminal}`:''}</small></div><Plane size={30}/><div><b>{result.arrival.iata||'—'}</b><span>{result.arrival.airport||'抵達機場'}</span><strong>{ftime(result.arrival.scheduled)}</strong><small>{result.arrival.terminal?`Terminal ${result.arrival.terminal}`:''}</small></div></div><button className="btn primary full" onClick={add}><Plus size={18}/>加入目前 Day</button></article>}</section>
+}
+
+function ExploreCenter({trip,onAdd}:{trip:Trip,onAdd:(x:Item)=>void}){
+ const [q,setQ]=useState(''),[loading,setLoading]=useState(false),[places,setPlaces]=useState<PlaceResult[]>([]),[msg,setMsg]=useState(''),[sq,setSq]=useState('')
+ const ss=useMemo(()=>stationSearch(sq),[sq])
+ const search=async()=>{if(!q.trim()){setMsg('請輸入地點、店名或地址。');return}setLoading(true);setMsg('');try{const full=`${q} ${trip.destination}`;const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&accept-language=zh-TW,zh,en,ko,ja&q=${encodeURIComponent(full)}`);if(!r.ok)throw new Error();const j=await r.json();setPlaces(j);if(!j.length)setMsg('免費地圖資料沒有找到結果，可改用 Google Maps 或 Naver Map。')}catch{setMsg('地點搜尋暫時無法使用，請改用外部地圖。')}finally{setLoading(false)}}
+ return <section className="explore-center"><div className="card feature-card"><div className="feature-head"><div><small>PLACE SEARCH</small><h2>地點探索</h2></div><MapPin size={30}/></div><div className="search-row"><input value={q} onChange={e=>setQ(e.target.value)} placeholder="搜尋景點、餐廳、住宿或地址"/><button className="icon" onClick={search}>{loading?<RefreshCw className="spin" size={18}/>:<Search size={18}/>}</button></div><div className="external"><a className="btn" target="_blank" rel="noreferrer" href={gmap(`${q} ${trip.destination}`)}>Google Maps</a><a className="btn" target="_blank" rel="noreferrer" href={nmap(`${q} ${trip.destination}`)}>Naver Map</a></div>{msg&&<p className="service-message">{msg}</p>}</div><div className="place-list">{places.map(p=><article className="card place-result" key={p.place_id}><div><h3>{p.display_name.split(',')[0]}</h3><p>{p.display_name}</p></div><div><a target="_blank" rel="noreferrer" href={gmap(p.display_name)}>地圖</a><button onClick={()=>onAdd({id:id(),type:'place',start:'09:00',end:'10:00',title:q||p.display_name.split(',')[0],note:p.display_name})}>加入 Day</button></div></article>)}</div><div className="card feature-card"><div className="feature-head"><div><small>TRANSIT STATION</small><h2>地鐵站搜尋</h2></div><span className="bigemoji">🚇</span></div><input value={sq} onChange={e=>setSq(e.target.value)} placeholder="例如：海雲台、西面、梅田、難波"/><div className="station-list">{ss.map(s=><button key={s.join('-')} onClick={()=>onAdd({id:id(),type:'transport',start:'09:00',end:'09:30',title:`前往${s[2]}站`,transportMode:'metro',to:`${s[2]} ${s[3]} ${s[4]}`,line:`${s[0]} ${s[1]}`})}><span><b>{s[2]}</b><small>{s[3]}・{s[4]}</small></span><em>{s[0]}・{s[1]}</em><Plus size={17}/></button>)}</div></div></section>
+}
+
 function TransportDetails({item}:{item:Item}){
  const m=item.transportMode||'metro'
  return <div className="transport-card"><div className="transport-title"><span>{modeEmoji[m]}</span><b>{modeLabel[m]}</b>{item.flightNo&&<strong>{item.flightNo}</strong>}{item.line&&<strong>{item.line}</strong>}</div>{(item.from||item.to)&&<div className="route"><span>{item.from||'出發地'}</span><b>→</b><span>{item.to||'抵達地'}</span></div>}<div className="transport-meta">{item.durationMin!=null&&<span><Clock3 size={15}/>{item.durationMin} 分鐘</span>}{item.distanceKm!=null&&<span><Ruler size={15}/>{item.distanceKm} 公里</span>}</div></div>
@@ -183,6 +208,7 @@ function App(){
  const [itemEditor,setItemEditor]=useState<{dayId:string,item?:Item}|null>(null)
  const [tab,setTab]=useState<string|null>(null)
  const [page,setPage]=useState<AppPage>('home')
+ const [flightOpen,setFlightOpen]=useState(false)
  const active=s.trips.find(t=>t.id===s.active)||null
  const update=(n:State)=>{setS(n);if(!readOnly)save(n)}
  useEffect(()=>{if(active&&!active.days.some(d=>d.id===tab))setTab(active.days[0]?.id||null)},[active?.id,active?.days.length])
@@ -196,6 +222,7 @@ function App(){
  }
  const remove=(t:Trip)=>{if(confirm(`確定刪除「${t.name}」？`)){const trips=s.trips.filter(x=>x.id!==t.id);update({...s,trips,active:s.active===t.id?(trips[0]?.id||null):s.active})}}
  const duplicate=(t:Trip)=>{const c={...structuredClone(t),id:id(),name:t.name+'（複製）',created:Date.now(),updated:Date.now()};update({...s,active:c.id,trips:[...s.trips,c]});setTab(c.days[0]?.id||null)}
+ const addToCurrentDay=(x:Item)=>{if(!active)return;const target=(active.days.find(d=>d.id===tab)||active.days[0]);if(!target)return;const t={...active,days:active.days.map(d=>d.id===target.id?{...d,items:[...d.items,x]}:d),updated:Date.now()};update({...s,trips:s.trips.map(z=>z.id===t.id?t:z)});alert(`已加入 ${target.title}`)}
  const saveItem=(x:Item)=>{
   if(!active||!itemEditor)return
   const t={...active,days:active.days.map(d=>d.id!==itemEditor.dayId?d:{...d,items:itemEditor.item?d.items.map(i=>i.id===x.id?x:i):[...d.items,x]}),updated:Date.now()}
@@ -254,11 +281,12 @@ function App(){
      {!readOnly&&<div className="quick"><button className="btn primary" onClick={share}><Share2 size={18}/>分享行程</button><button className="btn yellow" onClick={()=>window.print()}><FileDown size={18}/>列印／PDF</button></div>}
     </>}
     {page==='itinerary'&&itinerary}
-    {page==='explore'&&<ComingPage icon={<MapPin size={40}/>} title="探索"><p>Google Maps、Naver Map、地鐵站與收藏功能正在下一個 v2.2 小版本接入。</p><div className="search-mock"><Search size={19}/><span>搜尋景點、餐廳或住宿</span></div></ComingPage>}
+    {page==='explore'&&<ExploreCenter trip={active} onAdd={addToCurrentDay}/>}
     {page==='wallet'&&<ComingPage icon={<WalletCards size={40}/>} title="旅行錢包"><p>即時匯率、雙向換算、旅伴分帳與預算管理預定於 v2.3 啟用。</p></ComingPage>}
     {page==='translate'&&<ComingPage icon={<Languages size={40}/>} title="旅行翻譯"><p>敬語翻譯、慢速播放與點餐速查預定於 v2.3 啟用。</p></ComingPage>}
-    {page==='more'&&<section className="tools-grid"><button className="card tool-card" onClick={()=>setForm(active)}><Palette/><b>主題風格</b><span>10 種官方主題</span></button><button className="card tool-card" onClick={()=>window.print()}><FileDown/><b>旅行手冊</b><span>列印／PDF</span></button><button className="card tool-card"><Plane/><b>航班中心</b><span>即時查詢下一版本接入</span></button><button className="card tool-card"><CloudSun/><b>天氣中心</b><span>自動與手動更新</span></button></section>}
+    {page==='more'&&<section className="tools-grid"><button className="card tool-card" onClick={()=>setForm(active)}><Palette/><b>主題風格</b><span>10 種官方主題</span></button><button className="card tool-card" onClick={()=>window.print()}><FileDown/><b>旅行手冊</b><span>列印／PDF</span></button><button className="card tool-card" onClick={()=>setFlightOpen(true)}><Plane/><b>航班中心</b><span>輸入航班號碼查詢</span></button><button className="card tool-card"><CloudSun/><b>天氣中心</b><span>自動與手動更新</span></button></section>}
    </main>
+   {flightOpen&&<ModalShell title="航班中心" onClose={()=>setFlightOpen(false)}><FlightCenter trip={active} onAdd={x=>{addToCurrentDay(x);setFlightOpen(false)}}/></ModalShell>}
    <BottomNav page={page} onChange={setPage}/>
    {form&&<Form trip={form===true?undefined:form} onSave={saveTrip} onClose={()=>setForm(null)}/>}
    {itemEditor&&<ItemForm initial={itemEditor.item} onSave={saveItem} onClose={()=>setItemEditor(null)}/>}

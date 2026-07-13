@@ -1,23 +1,13 @@
-# Travel Planner Ultimate v2.2.0 — 介面基礎版
+# Travel Planner Ultimate v2.2.1
 
-## 本次完成
+新增航班中心、地點探索、Google Maps／Naver Map 外部搜尋，以及韓國、日本常用地鐵站搜尋。
 
-- 首頁改為旅行控制中心
-- 底部選單：首頁、行程、探索、錢包、翻譯、我的
-- 中文約 80%，保留 Day、Flight、QR Code 等旅行術語
-- 10 種官方主題，每趟旅行可獨立設定
-- Day 行程分頁
-- 新增行程視窗支援 iPhone 安全區，不再裁切頂端
-- 已建立的行程可重新編輯、刪除、複製、上移與下移
-- 天氣每 30 分鐘自動更新
-- 天氣可手動重新整理
-- 顯示最後更新時間
-- 離線時使用上次成功取得的天氣
+## 航班即時資料
+在 Netlify 環境變數新增：
 
-## 尚未宣稱完成
+`AVIATIONSTACK_API_KEY`
 
-航班即時 API、Google／Naver 官方地點搜尋與完整地鐵資料，需要在下一個 v2.2 小版本串接服務與金鑰。本版已先完成對應頁面、卡片與資料結構。
+未設定時仍可在行程中手動新增飛機卡。
 
-## 更新 GitHub
-
-解壓縮後，全選裡面的內容，拖進原本的 GitHub Repository 並覆蓋同名檔案，再 Commit。Netlify 會自動部署。
+## 更新
+解壓縮後全選內容，上傳並覆蓋原 GitHub Repository。請保留 `netlify/functions/flight.mjs` 資料夾結構。
