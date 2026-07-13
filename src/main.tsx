@@ -424,6 +424,17 @@ function TranslateCenter({trip}:{trip:Trip}){
  </section>
 }
 
+
+function TransitCenter({trip,onAdd}:{trip:Trip,onAdd:(item:Item)=>void}){
+ const [mode,setMode]=useState<TransportMode>('metro'),[from,setFrom]=useState(''),[to,setTo]=useState('')
+ const [start,setStart]=useState('09:00'),[end,setEnd]=useState('09:30'),[duration,setDuration]=useState('30')
+ const [distance,setDistance]=useState(''),[fare,setFare]=useState(''),[line,setLine]=useState(''),[note,setNote]=useState('')
+ const add=()=>{if(!from.trim()&&!to.trim())return alert('請至少輸入出發地或抵達地。');onAdd({id:id(),type:mode==='flight'?'flight':'transport',start,end,title:`${modeLabel[mode]}：${from||'出發地'} → ${to||'抵達地'}`,transportMode:mode,from,to,durationMin:duration?Number(duration):undefined,distanceKm:distance?Number(distance):undefined,line:line||undefined,note:[fare&&`預估費用：${fare} ${trip.currency}`,note].filter(Boolean).join('\n')})}
+ const g=()=>window.open(`https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(from)}&destination=${encodeURIComponent(to)}&travelmode=${mode==='walk'?'walking':mode==='car'||mode==='taxi'?'driving':'transit'}`,'_blank')
+ const n=()=>window.open(`https://map.naver.com/p/directions/${encodeURIComponent(from)}/${encodeURIComponent(to)}`,'_blank')
+ return <section className="transit-center"><article className="card transit-hero"><div className="feature-head"><div><small>SMART TRANSIT</small><h2>智慧交通中心</h2></div><span>{modeEmoji[mode]}</span></div><p>建立交通卡後可直接加入目前 Day，並可開啟地圖導航。</p></article><article className="card transit-builder"><label>交通方式<select value={mode} onChange={e=>setMode(e.target.value as TransportMode)}>{Object.entries(modeLabel).map(([k,v])=><option key={k} value={k}>{modeEmoji[k as TransportMode]} {v}</option>)}</select></label><div className="transit-two"><label>出發地<input value={from} onChange={e=>setFrom(e.target.value)} placeholder="例如：西面站"/></label><label>抵達地<input value={to} onChange={e=>setTo(e.target.value)} placeholder="例如：海雲台站"/></label></div><div className="transit-two"><label>開始時間<input type="time" value={start} onChange={e=>setStart(e.target.value)}/></label><label>結束時間<input type="time" value={end} onChange={e=>setEnd(e.target.value)}/></label></div><div className="transit-three"><label>時間（分鐘）<input type="number" min="0" value={duration} onChange={e=>setDuration(e.target.value)}/></label><label>距離（公里）<input type="number" min="0" step="0.1" value={distance} onChange={e=>setDistance(e.target.value)}/></label><label>費用（{trip.currency}）<input type="number" min="0" value={fare} onChange={e=>setFare(e.target.value)}/></label></div><label>路線／車次<input value={line} onChange={e=>setLine(e.target.value)} placeholder="例如：2號線、KTX 105"/></label><label>備註<textarea rows={3} value={note} onChange={e=>setNote(e.target.value)} placeholder="月台、出口、轉乘或集合資訊"/></label><div className="transit-actions"><button className="btn" onClick={g} disabled={!from||!to}>Google Maps</button><button className="btn" onClick={n} disabled={!from||!to}>Naver Map</button><button className="btn primary" onClick={add}><Plus size={17}/>加入目前 Day</button></div></article></section>
+}
+
 function TransportDetails({item}:{item:Item}){
  const m=item.transportMode||'metro'
  return <div className="transport-card"><div className="transport-title"><span>{modeEmoji[m]}</span><b>{modeLabel[m]}</b>{item.flightNo&&<strong>{item.flightNo}</strong>}{item.line&&<strong>{item.line}</strong>}</div>{(item.from||item.to)&&<div className="route"><span>{item.from||'出發地'}</span><b>→</b><span>{item.to||'抵達地'}</span></div>}<div className="transport-meta">{item.durationMin!=null&&<span><Clock3 size={15}/>{item.durationMin} 分鐘</span>}{item.distanceKm!=null&&<span><Ruler size={15}/>{item.distanceKm} 公里</span>}</div></div>
@@ -450,6 +461,7 @@ function App(){
  const [tab,setTab]=useState<string|null>(null)
  const [page,setPage]=useState<AppPage>('home')
  const [flightOpen,setFlightOpen]=useState(false)
+ const [transitOpen,setTransitOpen]=useState(false)
  const [weatherOpen,setWeatherOpen]=useState(false)
  const active=s.trips.find(t=>t.id===s.active)||null
  const update=(n:State)=>{setS(n);if(!readOnly)save(n)}
@@ -537,10 +549,11 @@ function App(){
     {page==='explore'&&<ExploreCenter trip={active} onAdd={addToCurrentDay}/>}
     {page==='wallet'&&<WalletCenter trip={active} onChange={updateWallet}/>}
     {page==='translate'&&<TranslateCenter trip={active}/>}
-    {page==='more'&&<section className="tools-grid"><button className="card tool-card" onClick={()=>setForm(active)}><Palette/><b>主題風格</b><span>10 種官方主題</span></button><button className="card tool-card" onClick={()=>window.print()}><FileDown/><b>旅行手冊</b><span>列印／PDF</span></button><button className="card tool-card" onClick={()=>setFlightOpen(true)}><Plane/><b>航班中心</b><span>輸入航班號碼查詢</span></button><button className="card tool-card" onClick={()=>setWeatherOpen(true)}><CloudSun/><b>天氣中心</b><span>七天天氣與手動更新</span></button></section>}
+    {page==='more'&&<section className="tools-grid"><button className="card tool-card" onClick={()=>setForm(active)}><Palette/><b>主題風格</b><span>10 種官方主題</span></button><button className="card tool-card" onClick={()=>window.print()}><FileDown/><b>旅行手冊</b><span>列印／PDF</span></button><button className="card tool-card" onClick={()=>setFlightOpen(true)}><Plane/><b>航班中心</b><span>查詢或手動建立航班</span></button><button className="card tool-card" onClick={()=>setTransitOpen(true)}><Compass/><b>交通中心</b><span>建立地鐵、公車與步行路線</span></button><button className="card tool-card" onClick={()=>setWeatherOpen(true)}><CloudSun/><b>天氣中心</b><span>七天天氣與手動更新</span></button></section>}
    </main>
    {weatherOpen&&<ModalShell title="天氣中心" onClose={()=>setWeatherOpen(false)}><Weather trip={active}/></ModalShell>}
    {flightOpen&&<ModalShell title="航班中心" onClose={()=>setFlightOpen(false)}><FlightCenter trip={active} onAdd={x=>{addToCurrentDay(x);setFlightOpen(false)}}/></ModalShell>}
+   {transitOpen&&<ModalShell title="智慧交通中心" onClose={()=>setTransitOpen(false)}><TransitCenter trip={active} onAdd={x=>{addToCurrentDay(x);setTransitOpen(false)}}/></ModalShell>}
    <BottomNav page={page} onChange={setPage}/>
    {form&&<Form trip={form===true?undefined:form} onSave={saveTrip} onClose={()=>setForm(null)}/>}
    {itemEditor&&<ItemForm initial={itemEditor.item} onSave={saveItem} onClose={()=>setItemEditor(null)}/>}
