@@ -1,5 +1,5 @@
 {
-  "name": "旅行手帳 Travel Planner Ultimate 2.0",
+  "name": "旅行手帳 Travel Planner Ultimate 2.2",
   "short_name": "旅行手帳",
   "start_url": "/",
   "display": "standalone",
@@ -19,5 +19,6 @@
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "description": "療癒系旅行控制中心、行程分頁、智慧天氣與十種主題"
 }
