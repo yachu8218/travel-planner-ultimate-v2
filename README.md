@@ -1,13 +1,21 @@
-# Travel Planner Ultimate v2.2.1
+# Travel Planner Ultimate v2.2.2
 
-新增航班中心、地點探索、Google Maps／Naver Map 外部搜尋，以及韓國、日本常用地鐵站搜尋。
+## 本次更新
 
-## 航班即時資料
-在 Netlify 環境變數新增：
+- 首頁直接顯示七天天氣
+- 天氣每 30 分鐘自動更新
+- 可按重新整理立即更新
+- 顯示最後更新時間
+- 離線時使用上一次成功資料
+- 首頁新增目前 Day、安排數量與旅行進度
+- 航班中心不需要 API Key 也能手動建立航班卡
+- 擴充韓國、日本常用地鐵站搜尋
+- 保留 10 種主題及所有舊旅行資料
 
-`AVIATIONSTACK_API_KEY`
+## API Key
 
-未設定時仍可在行程中手動新增飛機卡。
+本版不要求設定 API Key。即時航班查詢尚未設定時，請使用航班中心的「手動建立航班」。
 
-## 更新
-解壓縮後全選內容，上傳並覆蓋原 GitHub Repository。請保留 `netlify/functions/flight.mjs` 資料夾結構。
+## 更新方式
+
+解壓縮後，全選資料夾內的內容，上傳到原本 GitHub Repository 並覆蓋同名檔案。不要上傳外層資料夾本身。
