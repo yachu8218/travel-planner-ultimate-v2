@@ -148,3 +148,27 @@ input,select,textarea,button{max-width:100%}
  .quantity-table td:nth-child(2){font-size:13px}
  .item{grid-template-columns:50px minmax(0,1fr)}
 }
+
+/* v2.3.4 — UI Refinement */
+html,body{width:100%;max-width:100%;overflow-x:hidden!important}
+.app{width:100%;max-width:980px;overflow-x:hidden!important}
+.page-with-nav,.content{padding-bottom:calc(170px + env(safe-area-inset-bottom))!important}
+.page-with-nav>*:last-child,.content>*:last-child{margin-bottom:calc(28px + env(safe-area-inset-bottom))!important}
+.cover,.trip-cover,.hero-control,.control-card,.weather,.weather-day,.day-summary span,.transport-card,.card,.trip-card{background-image:none!important}
+.cover{background-color:var(--accent)!important}.trip-cover{background-color:var(--primary)!important}.hero-control{background-color:var(--primary)!important}.control-card,.weather,.card{background-color:var(--paper)!important}.weather-day,.day-summary span,.transport-card{background-color:var(--soft)!important}
+.cover>div,.trip-cover>div{background:rgba(35,43,42,.38)!important}
+.top{width:100%!important;max-width:100%!important;background:color-mix(in srgb,var(--primary) 28%,var(--paper))!important;background-image:none!important;border-bottom:2px solid var(--ink)!important;box-shadow:0 4px 0 color-mix(in srgb,var(--ink) 82%,transparent)!important}
+.top::before,.top::after{display:none!important;content:none!important}
+.card,.trip-card,.day,.body,.cover{border-width:2px!important;box-shadow:4px 4px 0 color-mix(in srgb,var(--ink) 84%,transparent)!important}
+.icon,.btn,.theme-option,.day-tabs button{box-shadow:3px 3px 0 color-mix(in srgb,var(--ink) 82%,transparent)!important}
+.icon{width:38px!important;height:38px!important;border-width:2px!important}.btn{min-height:38px;padding:8px 12px!important;border-width:2px!important}
+.control-grid{gap:12px!important}.control-card{padding:14px!important;min-height:122px!important}.weather{padding:14px!important}
+.amount-shortcuts{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px!important;overflow-x:hidden!important}
+.amount-shortcuts button{width:100%;white-space:normal!important;padding:6px 4px!important;font-size:11px}
+.phrase-tabs,.counter-tabs,.day-tabs,.weather-row{flex-wrap:wrap!important;overflow-x:hidden!important}
+.rate-grid{grid-template-columns:minmax(0,1fr) 82px!important;width:100%}.rate-grid>*{min-width:0}
+.quantity-table-wrap{width:100%;max-width:100%;overflow-x:hidden!important}.quantity-table{width:100%!important;min-width:0!important;table-layout:fixed}.quantity-table th,.quantity-table td{padding:8px 6px!important;word-break:break-word}.quantity-table th:nth-child(1),.quantity-table td:nth-child(1){width:22%}.quantity-table th:nth-child(2),.quantity-table td:nth-child(2){width:58%}.quantity-table th:nth-child(3),.quantity-table td:nth-child(3){width:20%;text-align:center}
+.item{grid-template-columns:54px minmax(0,1fr)!important;gap:7px!important;margin-bottom:8px!important}.time{padding:5px 3px!important;font-size:11px!important}.body{padding:7px 8px!important}.body h3{font-size:15px!important}.body>p{font-size:11px!important}
+.bottom-nav{border-top-width:2px!important;background:var(--paper)!important;box-shadow:0 -3px 0 color-mix(in srgb,var(--ink) 72%,transparent)}
+@media(max-width:600px){.content{padding-left:12px!important;padding-right:12px!important}.page-with-nav,.content{padding-bottom:calc(190px + env(safe-area-inset-bottom))!important}.control-grid{grid-template-columns:1fr!important}.hero-control{grid-column:auto!important}.control-card{min-height:auto!important}.weather-row{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px!important}.weather-day{min-width:0!important;padding:7px 4px!important}.amount-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:390px){.weather-row{grid-template-columns:repeat(2,minmax(0,1fr))}}

@@ -1,5 +1,5 @@
 {
-  "name": "旅行手帳 Travel Planner Ultimate 2.3.3",
+  "name": "旅行手帳 Travel Planner Ultimate 2.3.4",
   "short_name": "旅行手帳",
   "start_url": "/",
   "display": "standalone",
@@ -20,5 +20,5 @@
       "purpose": "any maskable"
     }
   ],
-  "description": "全站固定寬度、禁止橫向捲動與緊湊響應式版面"
+  "description": "單色卡片與底部安全留白的 UI Refinement 版本"
 }
