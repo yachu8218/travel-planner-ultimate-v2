@@ -223,18 +223,46 @@ function WalletCenter({trip,onChange}:{trip:Trip,onChange:(w:WalletData)=>void})
  const [exp,setExp]=useState({title:'',amount:'',currency:trip.currency,payerId:wallet.travelers[0]?.id||'',participantIds:wallet.travelers.map(t=>t.id),category:'餐飲',date:new Date().toLocaleDateString('en-CA'),note:''})
  const converted=rate?Number(amount||0)*rate:0
  const loadRate=async(force=false)=>{
-  if(from===to){setRate(1);setRateDate(new Date().toLocaleDateString('en-CA'));return}
+  if(from===to){setRate(1);setRateDate(new Date().toLocaleDateString('en-CA'));setRateMsg('');return}
   const key=`${from}-${to}`
-  try{
-   const cache=JSON.parse(localStorage.getItem(RATE_KEY)||'{}')
-   if(!force&&cache[key]&&Date.now()-cache[key].at<12*60*60*1000){setRate(cache[key].rate);setRateDate(cache[key].date);return}
-   setRateMsg('更新匯率中…')
-   const r=await fetch(`https://api.frankfurter.dev/v1/latest?base=${encodeURIComponent(from)}&symbols=${encodeURIComponent(to)}`)
-   if(!r.ok)throw new Error()
-   const j=await r.json();const next=Number(j.rates?.[to]);if(!next)throw new Error()
-   setRate(next);setRateDate(j.date||'');localStorage.setItem(RATE_KEY,JSON.stringify({...cache,[key]:{rate:next,date:j.date,at:Date.now()}}));setRateMsg('')
-  }catch{
-   const cache=JSON.parse(localStorage.getItem(RATE_KEY)||'{}');if(cache[key]){setRate(cache[key].rate);setRateDate(cache[key].date);setRateMsg('目前離線，使用上次匯率')}else setRateMsg('目前無法取得匯率，請稍後再試。')
+  const cache=JSON.parse(localStorage.getItem(RATE_KEY)||'{}')
+  if(!force&&cache[key]&&Date.now()-cache[key].at<12*60*60*1000){
+   setRate(cache[key].rate);setRateDate(cache[key].date);setRateMsg(`使用已儲存匯率・來源 ${cache[key].source||'快取'}`);return
+  }
+  setRateMsg('正在更新匯率…')
+  const providers=[
+   async()=>{
+    const r=await fetch(`https://open.er-api.com/v6/latest/${encodeURIComponent(from)}`)
+    if(!r.ok)throw new Error()
+    const j=await r.json(),next=Number(j.rates?.[to]);if(!next)throw new Error()
+    return{rate:next,date:new Date((j.time_last_update_unix||Date.now()/1000)*1000).toLocaleDateString('en-CA'),source:'ExchangeRate-API'}
+   },
+   async()=>{
+    const r=await fetch(`https://api.frankfurter.app/latest?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)
+    if(!r.ok)throw new Error()
+    const j=await r.json(),next=Number(j.rates?.[to]);if(!next)throw new Error()
+    return{rate:next,date:j.date||new Date().toLocaleDateString('en-CA'),source:'Frankfurter'}
+   },
+   async()=>{
+    const code=from.toLowerCase()
+    const r=await fetch(`https://latest.currency-api.pages.dev/v1/currencies/${code}.json`)
+    if(!r.ok)throw new Error()
+    const j=await r.json(),next=Number(j[code]?.[to.toLowerCase()]);if(!next)throw new Error()
+    return{rate:next,date:j.date||new Date().toLocaleDateString('en-CA'),source:'Currency API'}
+   }
+  ]
+  for(const provider of providers){
+   try{
+    const result=await provider()
+    setRate(result.rate);setRateDate(result.date);setRateMsg(`已更新・來源 ${result.source}`)
+    localStorage.setItem(RATE_KEY,JSON.stringify({...cache,[key]:{...result,at:Date.now()}}))
+    return
+   }catch{}
+  }
+  if(cache[key]){
+   setRate(cache[key].rate);setRateDate(cache[key].date);setRateMsg(`目前離線，使用上次匯率・來源 ${cache[key].source||'快取'}`)
+  }else{
+   setRate(null);setRateDate('');setRateMsg('目前無法取得匯率，請確認網路後按重新整理。')
   }
  }
  useEffect(()=>{loadRate(false)},[from,to])
@@ -252,7 +280,7 @@ function WalletCenter({trip,onChange}:{trip:Trip,onChange:(w:WalletData)=>void})
  })
  return <section className="wallet-center">
   <article className="card wallet-hero"><div><small>TRAVEL WALLET</small><h2>旅行錢包</h2><p>{trip.destination}・{trip.currency}</p></div><div><small>目前總支出</small><strong>{money(totalTwd,'TWD')}</strong><span>預算 {wallet.budgetTwd?Math.round(totalTwd/wallet.budgetTwd*100):0}%</span></div></article>
-  <article className="card rate-card"><div className="feature-head"><div><small>EXCHANGE RATE</small><h2>雙向匯率換算</h2></div><button className="icon" onClick={()=>loadRate(true)}><RefreshCw size={18}/></button></div><div className="rate-grid"><div><label>金額<input inputMode="decimal" value={amount} onChange={e=>setAmount(e.target.value)}/></label><select value={from} onChange={e=>setFrom(e.target.value)}><option>{trip.currency}</option><option>TWD</option><option>USD</option><option>EUR</option><option>JPY</option><option>KRW</option></select></div><button className="swap" onClick={swap}>⇄</button><div><label>換算結果<input readOnly value={rate?converted.toFixed(currencyDigits(to)):''}/></label><select value={to} onChange={e=>setTo(e.target.value)}><option>TWD</option><option>{trip.currency}</option><option>USD</option><option>EUR</option><option>JPY</option><option>KRW</option></select></div></div><p className="rate-status">{rate?`1 ${from} ≈ ${rate.toFixed(6)} ${to}・資料日期 ${rateDate}`:rateMsg||'正在取得匯率…'}</p></article>
+  <article className="card rate-card"><div className="feature-head"><div><small>EXCHANGE RATE</small><h2>雙向匯率換算</h2></div><button className="icon" onClick={()=>loadRate(true)}><RefreshCw size={18}/></button></div><div className="rate-grid"><div><label>金額<input inputMode="decimal" value={amount} onChange={e=>setAmount(e.target.value)}/></label><select value={from} onChange={e=>setFrom(e.target.value)}><option>{trip.currency}</option><option>TWD</option><option>USD</option><option>EUR</option><option>JPY</option><option>KRW</option></select></div><button className="swap" onClick={swap}>⇄</button><div><label>換算結果<input readOnly value={rate?converted.toFixed(currencyDigits(to)):''}/></label><select value={to} onChange={e=>setTo(e.target.value)}><option>TWD</option><option>{trip.currency}</option><option>USD</option><option>EUR</option><option>JPY</option><option>KRW</option></select></div></div><div className="amount-shortcuts">{(trip.currency==='KRW'?[1000,5000,10000,30000,50000,100000]:trip.currency==='JPY'?[100,500,1000,3000,5000,10000]:[10,20,50,100,200,500]).map(v=><button key={v} onClick={()=>{setFrom(trip.currency);setTo('TWD');setAmount(String(v))}}>{new Intl.NumberFormat('zh-TW').format(v)} {trip.currency}</button>)}</div><p className="rate-status">{rate?`1 ${from} ≈ ${rate.toFixed(6)} ${to}・資料日期 ${rateDate}・${rateMsg}`:rateMsg||'正在取得匯率…'}</p></article>
   <article className="card budget-card"><div className="feature-head"><div><small>BUDGET</small><h2>旅行預算</h2></div><span>{wallet.budgetTwd?`${Math.max(0,Math.round(100-totalTwd/wallet.budgetTwd*100))}% 剩餘`:'尚未設定'}</span></div><label>總預算（台幣）<input type="number" min="0" value={wallet.budgetTwd||''} onChange={e=>onChange({...wallet,budgetTwd:Number(e.target.value)||0})}/></label><label>海外刷卡手續費（%）<input type="number" min="0" step="0.1" value={wallet.overseasFee} onChange={e=>onChange({...wallet,overseasFee:Number(e.target.value)||0})}/></label></article>
   <article className="card travelers-card"><div className="feature-head"><div><small>TRAVELERS</small><h2>旅伴</h2></div><span>{wallet.travelers.length} 人</span></div><div className="traveler-add"><input value={newName} onChange={e=>setNewName(e.target.value)} placeholder="輸入旅伴姓名"/><button className="btn primary" onClick={addTraveler}><Plus size={17}/>新增</button></div><div className="traveler-chips">{wallet.travelers.map(t=><span key={t.id}>{t.name}<button onClick={()=>removeTraveler(t.id)}>×</button></span>)}</div></article>
   <div className="wallet-section-head"><div><small>EXPENSES</small><h2>消費紀錄</h2></div><button className="btn primary" onClick={()=>setExpenseOpen(true)}><Plus size={17}/>新增消費</button></div>
@@ -262,29 +290,138 @@ function WalletCenter({trip,onChange}:{trip:Trip,onChange:(w:WalletData)=>void})
  </section>
 }
 
-const phrasebook:Record<string,{category:string;zh:string;translated:string}[]>={
- 'ko-KR':[
-  {category:'常用',zh:'你好。',translated:'안녕하세요.'},{category:'常用',zh:'謝謝。',translated:'감사합니다.'},{category:'餐廳',zh:'請給我菜單。',translated:'메뉴판 부탁드립니다.'},{category:'餐廳',zh:'請幫我結帳。',translated:'계산 부탁드립니다.'},{category:'餐廳',zh:'我們有幾位。',translated:'저희는 몇 명입니다.'},{category:'飯店',zh:'我要辦理入住。',translated:'체크인 부탁드립니다.'},{category:'交通',zh:'請問這班車會到這裡嗎？',translated:'이 차가 여기까지 가나요?'},{category:'購物',zh:'可以退稅嗎？',translated:'택스 리펀드가 가능한가요?'},{category:'醫療',zh:'我需要看醫生。',translated:'진료를 받고 싶습니다.'}
- ],
- 'ja-JP':[
-  {category:'常用',zh:'你好。',translated:'こんにちは。'},{category:'常用',zh:'謝謝。',translated:'ありがとうございます。'},{category:'餐廳',zh:'請給我菜單。',translated:'メニューをお願いします。'},{category:'餐廳',zh:'請幫我結帳。',translated:'お会計をお願いします。'},{category:'飯店',zh:'我要辦理入住。',translated:'チェックインをお願いします。'},{category:'交通',zh:'請問這班車會到這裡嗎？',translated:'この電車はここまで行きますか。'},{category:'購物',zh:'可以退稅嗎？',translated:'免税できますか。'},{category:'醫療',zh:'我需要看醫生。',translated:'診察を受けたいです。'}
- ]
+
+type Phrase={category:string;zh:string;translated:string}
+const zhScenes:Record<string,string[]>={
+ '常用':['你好。','謝謝。','不好意思。','請問可以幫我嗎？','請再說一次。','請說慢一點。','我聽不懂。','這是什麼意思？','請寫下來。','沒關係。'],
+ '餐廳':['請給我菜單。','請推薦招牌餐點。','我要這個。','不要辣。','不要香菜。','請少冰。','請少糖。','請幫我打包。','可以刷卡嗎？','請幫我結帳。'],
+ '飯店':['我要辦理入住。','我要辦理退房。','可以寄放行李嗎？','Wi-Fi密碼是什麼？','可以多給一條毛巾嗎？','房間沒有熱水。','房卡不能使用。','有洗衣機嗎？','可以延後退房嗎？','請幫我叫計程車。'],
+ '交通':['請問地鐵站在哪裡？','這班車會到這裡嗎？','下一站是哪裡？','我要去哪個月台？','哪一個出口？','哪裡可以買票？','到機場要多久？','請帶我去這個地址。','請在這裡停。','可以幫我叫計程車嗎？'],
+ '購物':['這個多少錢？','有其他顏色嗎？','有其他尺寸嗎？','可以試穿嗎？','有折扣嗎？','可以退稅嗎？','我要買這個。','可以分開結帳嗎？','可以刷卡嗎？','請幫我裝袋。'],
+ '醫療':['我不舒服。','我發燒。','我頭痛。','我肚子痛。','我對這種藥過敏。','我需要藥局。','我需要看醫生。','我受傷了。','請幫我叫救護車。','附近有醫院嗎？'],
+ '緊急':['我需要幫助。','請幫我報警。','我迷路了。','我的護照遺失了。','我的錢包不見了。','我的手機不見了。','我需要翻譯人員。','請聯絡台灣代表處。','請不要離開。','這裡安全嗎？']
 }
-const localePair=(locale:string)=>locale.startsWith('ko')?'zh-TW|ko':locale.startsWith('ja')?'zh-TW|ja':locale.startsWith('th')?'zh-TW|th':'zh-TW|en'
+const translations:Record<string,Record<string,string[]>>={
+ 'ko-KR':{
+ '常用':['안녕하세요.','감사합니다.','실례합니다.','도와주실 수 있을까요?','다시 말씀해 주세요.','천천히 말씀해 주세요.','잘 이해하지 못했습니다.','이게 무슨 뜻인가요?','적어 주세요.','괜찮습니다.'],
+ '餐廳':['메뉴판 부탁드립니다.','대표 메뉴를 추천해 주세요.','이것으로 주세요.','맵지 않게 해 주세요.','고수는 빼 주세요.','얼음은 조금만 넣어 주세요.','당도는 낮게 해 주세요.','포장해 주세요.','카드 결제가 가능한가요?','계산 부탁드립니다.'],
+ '飯店':['체크인 부탁드립니다.','체크아웃 부탁드립니다.','짐을 맡길 수 있을까요?','와이파이 비밀번호가 무엇인가요?','수건을 한 장 더 주실 수 있을까요?','방에 뜨거운 물이 나오지 않습니다.','객실 카드키가 작동하지 않습니다.','세탁기가 있나요?','체크아웃 시간을 늦출 수 있을까요?','택시를 불러 주세요.'],
+ '交通':['지하철역이 어디인가요?','이 차가 여기까지 가나요?','다음 역은 어디인가요?','어느 승강장으로 가야 하나요?','몇 번 출구인가요?','표는 어디에서 살 수 있나요?','공항까지 얼마나 걸리나요?','이 주소로 데려다 주세요.','여기에서 세워 주세요.','택시를 불러 주실 수 있나요?'],
+ '購物':['이것은 얼마인가요?','다른 색상이 있나요?','다른 사이즈가 있나요?','입어 봐도 될까요?','할인이 있나요?','택스 리펀드가 가능한가요?','이것을 구매하겠습니다.','따로 계산할 수 있나요?','카드 결제가 가능한가요?','봉투에 넣어 주세요.'],
+ '醫療':['몸이 좋지 않습니다.','열이 납니다.','머리가 아픕니다.','배가 아픕니다.','이 약에 알레르기가 있습니다.','약국이 필요합니다.','진료를 받고 싶습니다.','다쳤습니다.','구급차를 불러 주세요.','근처에 병원이 있나요?'],
+ '緊急':['도움이 필요합니다.','경찰에 신고해 주세요.','길을 잃었습니다.','여권을 잃어버렸습니다.','지갑을 잃어버렸습니다.','휴대전화를 잃어버렸습니다.','통역사가 필요합니다.','대만 대표부에 연락해 주세요.','떠나지 말아 주세요.','여기는 안전한가요?']},
+ 'ja-JP':{
+ '常用':['こんにちは。','ありがとうございます。','すみません。','手伝っていただけますか。','もう一度お願いします。','ゆっくり話してください。','よく分かりません。','これはどういう意味ですか。','書いてください。','大丈夫です。'],
+ '餐廳':['メニューをお願いします。','おすすめ料理を教えてください。','これをお願いします。','辛くしないでください。','パクチーを抜いてください。','氷を少なめにしてください。','甘さ控えめでお願いします。','持ち帰りにしてください。','カードは使えますか。','お会計をお願いします。'],
+ '飯店':['チェックインをお願いします。','チェックアウトをお願いします。','荷物を預かっていただけますか。','Wi-Fiのパスワードは何ですか。','タオルをもう一枚いただけますか。','部屋のお湯が出ません。','ルームキーが使えません。','洗濯機はありますか。','チェックアウトを延長できますか。','タクシーを呼んでください。'],
+ '交通':['地下鉄の駅はどこですか。','この電車はここまで行きますか。','次の駅はどこですか。','何番ホームですか。','何番出口ですか。','切符はどこで買えますか。','空港までどのくらいかかりますか。','この住所までお願いします。','ここで止めてください。','タクシーを呼んでいただけますか。'],
+ '購物':['これはいくらですか。','ほかの色はありますか。','ほかのサイズはありますか。','試着してもいいですか。','割引はありますか。','免税できますか。','これを買います。','別々に会計できますか。','カードは使えますか。','袋に入れてください。'],
+ '醫療':['具合が悪いです。','熱があります。','頭が痛いです。','お腹が痛いです。','この薬にアレルギーがあります。','薬局を探しています。','診察を受けたいです。','けがをしました。','救急車を呼んでください。','近くに病院はありますか。'],
+ '緊急':['助けが必要です。','警察を呼んでください。','道に迷いました。','パスポートをなくしました。','財布をなくしました。','携帯電話をなくしました。','通訳が必要です。','台湾の代表処に連絡してください。','ここを離れないでください。','ここは安全ですか。']},
+ 'th-TH':{
+ '常用':['สวัสดีค่ะ/ครับ','ขอบคุณค่ะ/ครับ','ขอโทษค่ะ/ครับ','ช่วยฉันได้ไหมคะ/ครับ','กรุณาพูดอีกครั้งค่ะ/ครับ','กรุณาพูดช้าๆ ค่ะ/ครับ','ฉันไม่เข้าใจค่ะ/ครับ','นี่หมายความว่าอะไรคะ/ครับ','กรุณาเขียนให้หน่อยค่ะ/ครับ','ไม่เป็นไรค่ะ/ครับ'],
+ '餐廳':['ขอเมนูหน่อยค่ะ/ครับ','ช่วยแนะนำเมนูขึ้นชื่อหน่อยค่ะ/ครับ','เอาอันนี้ค่ะ/ครับ','ไม่เผ็ดค่ะ/ครับ','ไม่ใส่ผักชีค่ะ/ครับ','ใส่น้ำแข็งน้อยๆ ค่ะ/ครับ','หวานน้อยค่ะ/ครับ','ใส่กล่องกลับบ้านให้หน่อยค่ะ/ครับ','จ่ายบัตรได้ไหมคะ/ครับ','คิดเงินด้วยค่ะ/ครับ'],
+ '飯店':['ขอเช็กอินค่ะ/ครับ','ขอเช็กเอาต์ค่ะ/ครับ','ฝากกระเป๋าได้ไหมคะ/ครับ','รหัส Wi-Fi คืออะไรคะ/ครับ','ขอผ้าเช็ดตัวเพิ่มหนึ่งผืนค่ะ/ครับ','ในห้องไม่มีน้ำร้อนค่ะ/ครับ','คีย์การ์ดใช้ไม่ได้ค่ะ/ครับ','มีเครื่องซักผ้าไหมคะ/ครับ','ขอเลทเช็กเอาต์ได้ไหมคะ/ครับ','ช่วยเรียกแท็กซี่ให้หน่อยค่ะ/ครับ'],
+ '交通':['สถานีรถไฟใต้ดินอยู่ที่ไหนคะ/ครับ','รถคันนี้ไปถึงที่นี่ไหมคะ/ครับ','สถานีถัดไปคือที่ไหนคะ/ครับ','ต้องไปชานชาลาไหนคะ/ครับ','ทางออกหมายเลขอะไรคะ/ครับ','ซื้อตั๋วได้ที่ไหนคะ/ครับ','ไปสนามบินใช้เวลานานเท่าไรคะ/ครับ','กรุณาพาไปที่อยู่นี้ค่ะ/ครับ','จอดตรงนี้ค่ะ/ครับ','ช่วยเรียกแท็กซี่ได้ไหมคะ/ครับ'],
+ '購物':['อันนี้ราคาเท่าไรคะ/ครับ','มีสีอื่นไหมคะ/ครับ','มีไซซ์อื่นไหมคะ/ครับ','ลองได้ไหมคะ/ครับ','มีส่วนลดไหมคะ/ครับ','ขอคืนภาษีได้ไหมคะ/ครับ','ฉันจะซื้ออันนี้ค่ะ/ครับ','แยกจ่ายได้ไหมคะ/ครับ','จ่ายบัตรได้ไหมคะ/ครับ','ใส่ถุงให้หน่อยค่ะ/ครับ'],
+ '醫療':['ฉันไม่สบายค่ะ/ครับ','ฉันมีไข้ค่ะ/ครับ','ฉันปวดหัวค่ะ/ครับ','ฉันปวดท้องค่ะ/ครับ','ฉันแพ้ยานี้ค่ะ/ครับ','ฉันต้องการหาร้านขายยาค่ะ/ครับ','ฉันต้องการพบแพทย์ค่ะ/ครับ','ฉันได้รับบาดเจ็บค่ะ/ครับ','ช่วยเรียกรถพยาบาลค่ะ/ครับ','มีโรงพยาบาลใกล้ๆ ไหมคะ/ครับ'],
+ '緊急':['ฉันต้องการความช่วยเหลือค่ะ/ครับ','ช่วยโทรหาตำรวจค่ะ/ครับ','ฉันหลงทางค่ะ/ครับ','ฉันทำหนังสือเดินทางหายค่ะ/ครับ','ฉันทำกระเป๋าสตางค์หายค่ะ/ครับ','ฉันทำโทรศัพท์หายค่ะ/ครับ','ฉันต้องการล่ามค่ะ/ครับ','กรุณาติดต่อสำนักงานไต้หวันค่ะ/ครับ','กรุณาอย่าไปค่ะ/ครับ','ที่นี่ปลอดภัยไหมคะ/ครับ']},
+ 'en-US':{},
+ 'en-GB':{},
+ 'en-SG':{},
+ 'fr-FR':{}
+}
+const englishScenes:Record<string,string[]>={
+ '常用':['Hello.','Thank you.','Excuse me.','Could you help me?','Please say it again.','Please speak more slowly.','I do not understand.','What does this mean?','Please write it down.','That is okay.'],
+ '餐廳':['May I have the menu, please?','Could you recommend the signature dish?','I would like this one, please.','Please make it not spicy.','Please leave out the cilantro.','Less ice, please.','Less sugar, please.','Could you pack this to go?','Can I pay by card?','Could I have the bill, please?'],
+ '飯店':['I would like to check in.','I would like to check out.','Could you store my luggage?','What is the Wi-Fi password?','Could I have one more towel?','There is no hot water in my room.','My room key does not work.','Is there a washing machine?','Could I have a late check-out?','Could you call a taxi for me?'],
+ '交通':['Where is the subway station?','Does this train go there?','What is the next station?','Which platform should I use?','Which exit should I take?','Where can I buy a ticket?','How long does it take to the airport?','Please take me to this address.','Please stop here.','Could you call a taxi for me?'],
+ '購物':['How much is this?','Do you have another color?','Do you have another size?','May I try this on?','Is there a discount?','Can I get a tax refund?','I would like to buy this.','Can we pay separately?','Can I pay by card?','Please put it in a bag.'],
+ '醫療':['I do not feel well.','I have a fever.','I have a headache.','I have a stomachache.','I am allergic to this medicine.','I need a pharmacy.','I need to see a doctor.','I am injured.','Please call an ambulance.','Is there a hospital nearby?'],
+ '緊急':['I need help.','Please call the police.','I am lost.','I lost my passport.','I lost my wallet.','I lost my phone.','I need an interpreter.','Please contact the Taiwan representative office.','Please do not leave.','Is it safe here?']
+}
+translations['en-US']=englishScenes;translations['en-GB']=englishScenes;translations['en-SG']=englishScenes
+translations['fr-FR']={
+ '常用':['Bonjour.','Merci.','Excusez-moi.','Pouvez-vous m’aider, s’il vous plaît ?','Pouvez-vous répéter, s’il vous plaît ?','Parlez plus lentement, s’il vous plaît.','Je ne comprends pas.','Qu’est-ce que cela signifie ?','Pouvez-vous l’écrire ?','Ce n’est pas grave.'],
+ '餐廳':['Puis-je avoir le menu, s’il vous plaît ?','Pouvez-vous recommander la spécialité ?','Je voudrais ceci, s’il vous plaît.','Pas épicé, s’il vous plaît.','Sans coriandre, s’il vous plaît.','Peu de glaçons, s’il vous plaît.','Peu sucré, s’il vous plaît.','À emporter, s’il vous plaît.','Puis-je payer par carte ?','L’addition, s’il vous plaît.'],
+ '飯店':['Je voudrais faire le check-in.','Je voudrais faire le check-out.','Puis-je laisser mes bagages ?','Quel est le mot de passe Wi-Fi ?','Puis-je avoir une serviette supplémentaire ?','Il n’y a pas d’eau chaude dans la chambre.','La carte de la chambre ne fonctionne pas.','Y a-t-il une machine à laver ?','Puis-je partir plus tard ?','Pouvez-vous appeler un taxi ?'],
+ '交通':['Où est la station de métro ?','Ce train va-t-il jusque-là ?','Quelle est la prochaine station ?','Quel quai dois-je prendre ?','Quelle sortie dois-je prendre ?','Où puis-je acheter un billet ?','Combien de temps faut-il pour aller à l’aéroport ?','Conduisez-moi à cette adresse, s’il vous plaît.','Arrêtez-vous ici, s’il vous plaît.','Pouvez-vous appeler un taxi ?'],
+ '購物':['Combien coûte ceci ?','Avez-vous une autre couleur ?','Avez-vous une autre taille ?','Puis-je l’essayer ?','Y a-t-il une réduction ?','Puis-je obtenir une détaxe ?','Je voudrais acheter ceci.','Pouvons-nous payer séparément ?','Puis-je payer par carte ?','Mettez-le dans un sac, s’il vous plaît.'],
+ '醫療':['Je ne me sens pas bien.','J’ai de la fièvre.','J’ai mal à la tête.','J’ai mal au ventre.','Je suis allergique à ce médicament.','J’ai besoin d’une pharmacie.','J’ai besoin de voir un médecin.','Je suis blessé(e).','Appelez une ambulance, s’il vous plaît.','Y a-t-il un hôpital à proximité ?'],
+ '緊急':['J’ai besoin d’aide.','Appelez la police, s’il vous plaît.','Je suis perdu(e).','J’ai perdu mon passeport.','J’ai perdu mon portefeuille.','J’ai perdu mon téléphone.','J’ai besoin d’un interprète.','Contactez le bureau de représentation de Taïwan.','Ne partez pas, s’il vous plaît.','Est-ce sûr ici ?']
+}
+const phrasebookFor=(locale:string):Phrase[]=>{
+ const lang=translations[locale]||translations['en-US']
+ return Object.keys(zhScenes).flatMap(category=>zhScenes[category].map((zh,i)=>({category,zh,translated:(lang[category]||englishScenes[category])[i]})))
+}
+const localePair=(locale:string)=>locale.startsWith('ko')?'zh-TW|ko':locale.startsWith('ja')?'zh-TW|ja':locale.startsWith('th')?'zh-TW|th':locale.startsWith('fr')?'zh-TW|fr':'zh-TW|en'
+const languageTitle=(locale:string)=>locale.startsWith('ko')?'韓文':locale.startsWith('ja')?'日文':locale.startsWith('th')?'泰文':locale.startsWith('fr')?'法文':'英文'
+const counters:Record<string,{label:string;values:Record<string,string[]>}>={
+ '位':{label:'人數／位',values:{
+  'ko-KR':['한 명','두 명','세 명','네 명','다섯 명','여섯 명','일곱 명','여덟 명','아홉 명','열 명'],
+  'ja-JP':['1名','2名','3名','4名','5名','6名','7名','8名','9名','10名'],
+  'th-TH':['1 คน','2 คน','3 คน','4 คน','5 คน','6 คน','7 คน','8 คน','9 คน','10 คน'],
+  'fr-FR':['1 personne','2 personnes','3 personnes','4 personnes','5 personnes','6 personnes','7 personnes','8 personnes','9 personnes','10 personnes'],
+  'en':['1 person','2 people','3 people','4 people','5 people','6 people','7 people','8 people','9 people','10 people']}},
+ '杯':{label:'飲料／杯',values:{
+  'ko-KR':['한 잔','두 잔','세 잔','네 잔','다섯 잔','여섯 잔','일곱 잔','여덟 잔','아홉 잔','열 잔'],
+  'ja-JP':['1杯','2杯','3杯','4杯','5杯','6杯','7杯','8杯','9杯','10杯'],
+  'th-TH':['1 แก้ว','2 แก้ว','3 แก้ว','4 แก้ว','5 แก้ว','6 แก้ว','7 แก้ว','8 แก้ว','9 แก้ว','10 แก้ว'],
+  'fr-FR':['1 verre','2 verres','3 verres','4 verres','5 verres','6 verres','7 verres','8 verres','9 verres','10 verres'],
+  'en':['1 cup','2 cups','3 cups','4 cups','5 cups','6 cups','7 cups','8 cups','9 cups','10 cups']}},
+ '份':{label:'餐點／份',values:{
+  'ko-KR':['한 인분','두 인분','세 인분','네 인분','다섯 인분','여섯 인분','일곱 인분','여덟 인분','아홉 인분','십 인분'],
+  'ja-JP':['1人前','2人前','3人前','4人前','5人前','6人前','7人前','8人前','9人前','10人前'],
+  'th-TH':['1 ที่','2 ที่','3 ที่','4 ที่','5 ที่','6 ที่','7 ที่','8 ที่','9 ที่','10 ที่'],
+  'fr-FR':['1 portion','2 portions','3 portions','4 portions','5 portions','6 portions','7 portions','8 portions','9 portions','10 portions'],
+  'en':['1 serving','2 servings','3 servings','4 servings','5 servings','6 servings','7 servings','8 servings','9 servings','10 servings']}},
+ '個':{label:'物品／個',values:{
+  'ko-KR':['한 개','두 개','세 개','네 개','다섯 개','여섯 개','일곱 개','여덟 개','아홉 개','열 개'],
+  'ja-JP':['1つ','2つ','3つ','4つ','5つ','6つ','7つ','8つ','9つ','10個'],
+  'th-TH':['1 ชิ้น','2 ชิ้น','3 ชิ้น','4 ชิ้น','5 ชิ้น','6 ชิ้น','7 ชิ้น','8 ชิ้น','9 ชิ้น','10 ชิ้น'],
+  'fr-FR':['1 pièce','2 pièces','3 pièces','4 pièces','5 pièces','6 pièces','7 pièces','8 pièces','9 pièces','10 pièces'],
+  'en':['1 item','2 items','3 items','4 items','5 items','6 items','7 items','8 items','9 items','10 items']}},
+ '瓶':{label:'飲品／瓶',values:{
+  'ko-KR':['한 병','두 병','세 병','네 병','다섯 병','여섯 병','일곱 병','여덟 병','아홉 병','열 병'],
+  'ja-JP':['1本','2本','3本','4本','5本','6本','7本','8本','9本','10本'],
+  'th-TH':['1 ขวด','2 ขวด','3 ขวด','4 ขวด','5 ขวด','6 ขวด','7 ขวด','8 ขวด','9 ขวด','10 ขวด'],
+  'fr-FR':['1 bouteille','2 bouteilles','3 bouteilles','4 bouteilles','5 bouteilles','6 bouteilles','7 bouteilles','8 bouteilles','9 bouteilles','10 bouteilles'],
+  'en':['1 bottle','2 bottles','3 bottles','4 bottles','5 bottles','6 bottles','7 bottles','8 bottles','9 bottles','10 bottles']}},
+ '碗':{label:'食物／碗',values:{'ko-KR':['한 그릇','두 그릇','세 그릇','네 그릇','다섯 그릇','여섯 그릇','일곱 그릇','여덟 그릇','아홉 그릇','열 그릇'],'ja-JP':['1杯','2杯','3杯','4杯','5杯','6杯','7杯','8杯','9杯','10杯'],'th-TH':['1 ชาม','2 ชาม','3 ชาม','4 ชาม','5 ชาม','6 ชาม','7 ชาม','8 ชาม','9 ชาม','10 ชาม'],'fr-FR':['1 bol','2 bols','3 bols','4 bols','5 bols','6 bols','7 bols','8 bols','9 bols','10 bols'],'en':['1 bowl','2 bowls','3 bowls','4 bowls','5 bowls','6 bowls','7 bowls','8 bowls','9 bowls','10 bowls']}},
+ '盤':{label:'餐點／盤',values:{'ko-KR':['한 접시','두 접시','세 접시','네 접시','다섯 접시','여섯 접시','일곱 접시','여덟 접시','아홉 접시','열 접시'],'ja-JP':['1皿','2皿','3皿','4皿','5皿','6皿','7皿','8皿','9皿','10皿'],'th-TH':['1 จาน','2 จาน','3 จาน','4 จาน','5 จาน','6 จาน','7 จาน','8 จาน','9 จาน','10 จาน'],'fr-FR':['1 assiette','2 assiettes','3 assiettes','4 assiettes','5 assiettes','6 assiettes','7 assiettes','8 assiettes','9 assiettes','10 assiettes'],'en':['1 plate','2 plates','3 plates','4 plates','5 plates','6 plates','7 plates','8 plates','9 plates','10 plates']}},
+ '串':{label:'串物／串',values:{'ko-KR':['한 꼬치','두 꼬치','세 꼬치','네 꼬치','다섯 꼬치','여섯 꼬치','일곱 꼬치','여덟 꼬치','아홉 꼬치','열 꼬치'],'ja-JP':['1本','2本','3本','4本','5本','6本','7本','8本','9本','10本'],'th-TH':['1 ไม้','2 ไม้','3 ไม้','4 ไม้','5 ไม้','6 ไม้','7 ไม้','8 ไม้','9 ไม้','10 ไม้'],'fr-FR':['1 brochette','2 brochettes','3 brochettes','4 brochettes','5 brochettes','6 brochettes','7 brochettes','8 brochettes','9 brochettes','10 brochettes'],'en':['1 skewer','2 skewers','3 skewers','4 skewers','5 skewers','6 skewers','7 skewers','8 skewers','9 skewers','10 skewers']}}
+}
+const counterValues=(counter:string,locale:string)=>{
+ const entry=counters[counter],key=entry.values[locale]?locale:'en'
+ return entry.values[key]
+}
+
 function TranslateCenter({trip}:{trip:Trip}){
  const [text,setText]=useState('')
  const [translated,setTranslated]=useState('')
  const [loading,setLoading]=useState(false)
  const [msg,setMsg]=useState('')
  const [category,setCategory]=useState('常用')
+ const [counter,setCounter]=useState('位')
+ const [zoom,setZoom]=useState<{zh:string;translated:string}|null>(null)
  const [favorites,setFavorites]=useState<TranslationFavorite[]>(()=>{try{return JSON.parse(localStorage.getItem(`${TRANSLATION_KEY}:${trip.id}`)||'[]')}catch{return[]}})
- const phrases=phrasebook[trip.locale]||phrasebook['ko-KR']
- const categories=['常用','餐廳','飯店','交通','購物','醫療']
+ const phrases=phrasebookFor(trip.locale)
+ const categories=['常用','餐廳','飯店','交通','購物','醫療','緊急']
+ const targetName=languageTitle(trip.locale)
  const translate=async()=>{if(!text.trim())return;setLoading(true);setMsg('');try{const r=await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.trim())}&langpair=${encodeURIComponent(localePair(trip.locale))}`);if(!r.ok)throw new Error();const j=await r.json();const out=j.responseData?.translatedText;if(!out)throw new Error();setTranslated(out);setMsg('機器翻譯可能不完全符合敬語，重要場合建議搭配下方常用敬語。')}catch{setMsg('目前無法連線翻譯服務，仍可使用下方離線常用句。')}finally{setLoading(false)}}
- const speak=(value=translated)=>{if(!value)return;const u=new SpeechSynthesisUtterance(value);u.lang=trip.locale;u.rate=.78;speechSynthesis.cancel();speechSynthesis.speak(u)}
+ const speak=(value=translated)=>{if(!value)return;const u=new SpeechSynthesisUtterance(value);u.lang=trip.locale;u.rate=.68;speechSynthesis.cancel();speechSynthesis.speak(u)}
+ const copy=async(value:string)=>{try{await navigator.clipboard.writeText(value);alert('已複製')}catch{alert('無法複製，請長按文字複製。')}}
  const addFav=(s=text,t=translated)=>{if(!s||!t)return;const next=[...favorites,{id:id(),source:s,translated:t,locale:trip.locale}];setFavorites(next);localStorage.setItem(`${TRANSLATION_KEY}:${trip.id}`,JSON.stringify(next))}
  const removeFav=(fid:string)=>{const next=favorites.filter(f=>f.id!==fid);setFavorites(next);localStorage.setItem(`${TRANSLATION_KEY}:${trip.id}`,JSON.stringify(next))}
- return <section className="translate-center"><article className="card translate-hero"><small>TRAVEL TRANSLATE</small><h2>旅行翻譯</h2><p>目的地：{trip.destination}・{trip.language}敬語模式</p></article><article className="card translator-card"><label>中文內容<textarea rows={4} value={text} onChange={e=>setText(e.target.value)} placeholder="輸入想說的內容"/></label><button className="btn primary full" onClick={translate} disabled={loading}>{loading?<><RefreshCw className="spin" size={18}/>翻譯中</>:<><Languages size={18}/>翻譯成{trip.language}</>}</button><div className="translated-box"><small>{trip.language}</small><p>{translated||'翻譯結果會顯示在這裡。'}</p><div><button onClick={()=>speak()}>🔊 慢速播放</button><button onClick={()=>addFav()}>☆ 收藏</button></div></div>{msg&&<p className="translation-note">{msg}</p>}</article><article className="card phrase-card"><div className="feature-head"><div><small>POLITE PHRASES</small><h2>敬語常用句</h2></div></div><div className="phrase-tabs">{categories.map(c=><button className={category===c?'active':''} onClick={()=>setCategory(c)} key={c}>{c}</button>)}</div><div className="phrase-list">{phrases.filter(p=>p.category===category).map(p=><article key={p.zh}><div><b>{p.zh}</b><p>{p.translated}</p></div><div><button onClick={()=>speak(p.translated)}>🔊</button><button onClick={()=>addFav(p.zh,p.translated)}>☆</button></div></article>)}</div></article><article className="card quantity-card"><small>ORDER QUICK GUIDE</small><h2>點餐數量速查</h2><div className="quantity-grid">{[['1位','한 명 / ひとり'],['2位','두 명 / ふたり'],['1份','한 개 / 一つ'],['2份','두 개 / 二つ'],['1杯','한 잔 / 一杯'],['1瓶','한 병 / 一本']].map(x=><div key={x[0]}><b>{x[0]}</b><span>{x[1]}</span></div>)}</div></article><article className="card favorites-card"><small>FAVORITES</small><h2>收藏句子</h2>{favorites.length?favorites.map(f=><div className="favorite-row" key={f.id}><div><b>{f.source}</b><p>{f.translated}</p></div><button onClick={()=>removeFav(f.id)}><Trash2 size={16}/></button></div>):<p className="empty">還沒有收藏句子。</p>}</article></section>
+ const values=counterValues(counter,trip.locale)
+ return <section className="translate-center">
+  <article className="card translate-hero"><small>TRAVEL TRANSLATE</small><h2>旅行翻譯</h2><p>目的地：{trip.destination}・只顯示{targetName}禮貌用語</p></article>
+  <article className="card translator-card"><label>中文內容<textarea rows={4} value={text} onChange={e=>setText(e.target.value)} placeholder="輸入想說的內容"/></label><button className="btn primary full" onClick={translate} disabled={loading}>{loading?<><RefreshCw className="spin" size={18}/>翻譯中</>:<><Languages size={18}/>翻譯成{targetName}</>}</button><div className="translated-box"><small>{targetName}</small><p>{translated||'翻譯結果會顯示在這裡。'}</p><div><button onClick={()=>speak()}>🔊 慢速播放</button><button onClick={()=>copy(translated)}>複製</button><button onClick={()=>addFav()}>☆ 收藏</button></div></div>{msg&&<p className="translation-note">{msg}</p>}</article>
+  <article className="card phrase-card"><div className="feature-head"><div><small>POLITE PHRASES</small><h2>敬語常用句</h2></div><span>每個場景 10 句</span></div><div className="phrase-tabs">{categories.map(c=><button className={category===c?'active':''} onClick={()=>setCategory(c)} key={c}>{c}</button>)}</div><div className="phrase-list">{phrases.filter(p=>p.category===category).map(p=><article key={p.zh} onClick={()=>setZoom(p)}><div><b>{p.zh}</b><p>{p.translated}</p></div><div><button onClick={e=>{e.stopPropagation();speak(p.translated)}}>🔊</button><button onClick={e=>{e.stopPropagation();copy(p.translated)}}>複製</button><button onClick={e=>{e.stopPropagation();addFav(p.zh,p.translated)}}>☆</button></div></article>)}</div></article>
+  <article className="card quantity-card"><small>ORDER QUICK GUIDE</small><h2>點餐數量速查表</h2><p>依目的地只顯示{targetName}，可點擊放大給店員看。</p><div className="counter-tabs">{Object.entries(counters).map(([key,v])=><button className={counter===key?'active':''} onClick={()=>setCounter(key)} key={key}>{v.label}</button>)}</div><div className="quantity-table-wrap"><table className="quantity-table"><thead><tr><th>中文</th><th>{targetName}</th><th>播放</th></tr></thead><tbody>{values.map((v,i)=><tr key={v} onClick={()=>setZoom({zh:`${i+1}${counter}`,translated:v})}><td>{i+1}{counter}</td><td>{v}</td><td><button onClick={e=>{e.stopPropagation();speak(v)}}>🔊</button></td></tr>)}</tbody></table></div></article>
+  <article className="card favorites-card"><small>FAVORITES</small><h2>收藏句子</h2>{favorites.length?favorites.map(f=><div className="favorite-row" key={f.id}><div onClick={()=>setZoom({zh:f.source,translated:f.translated})}><b>{f.source}</b><p>{f.translated}</p></div><button onClick={()=>removeFav(f.id)}><Trash2 size={16}/></button></div>):<p className="empty">還沒有收藏句子。</p>}</article>
+  {zoom&&<ModalShell title="給店員看" onClose={()=>setZoom(null)}><div className="phrase-zoom"><small>{zoom.zh}</small><strong>{zoom.translated}</strong><button className="btn primary full" onClick={()=>speak(zoom.translated)}>🔊 慢速播放</button><button className="btn full" onClick={()=>copy(zoom.translated)}>複製文字</button></div></ModalShell>}
+ </section>
 }
 
 function TransportDetails({item}:{item:Item}){
