@@ -1,15 +1,12 @@
 Travel Planner Ultimate
-Version: 2.6.2 — Smart Place Card UI
+Version: 2.6.3 — Compact Place Card
 
-新增與美化：
-- 店名放大、加粗並使用主題強調色
-- 類別 Badge
-- 評分、評論數、營業狀態 Badge
-- 今日營業時間摘要
-- 完整營業時間展開／收合
-- 地址精簡與完整地址展開
-- Google Maps、NAVER Map 快捷按鈕
-- 電話可直接撥打
-- Google Places 店家照片
-- 無照片時顯示地點圖示
-- 地點卡淡入動畫
+調整：
+- 保留目前橘色店名
+- 沒有店家照片時完全隱藏照片區
+- 有照片時才顯示
+- 地址最多兩行，可展開完整地址
+- 今日營業時間維持摘要，可展開完整一週
+- Google Maps／NAVER Map 按鈕縮小
+- 移除重複地址顯示
+- 整張地點卡高度縮短

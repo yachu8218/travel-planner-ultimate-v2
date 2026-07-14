@@ -598,9 +598,9 @@ function PlaceCardDetails({item}:{item:Item}){
  const google=()=>window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`,'_blank')
  const naver=()=>window.open(`https://map.naver.com/p/search/${encodeURIComponent(query)}`,'_blank')
  return <div className="smart-place-card">
-  <div className="place-photo-wrap">
-   {photoUrl?<img src={photoUrl} alt={item.title} loading="lazy" onError={e=>{(e.currentTarget.parentElement as HTMLElement).classList.add('photo-error')}}/>:<div className="place-photo-fallback">{category.emoji}</div>}
-  </div>
+  {photoUrl&&<div className="place-photo-wrap">
+   <img src={photoUrl} alt={item.title} loading="lazy" onError={e=>{(e.currentTarget.parentElement as HTMLElement).style.display='none'}}/>
+  </div>}
   <div className="place-card-head">
    <span className="place-category-badge">{category.emoji} {category.label}</span>
    <h3 className="place-title">{item.title}</h3>
@@ -610,7 +610,7 @@ function PlaceCardDetails({item}:{item:Item}){
    <span>👥 {item.userRatingCount||0}則</span>
    {item.openNow!=null&&<span className={item.openNow?'open':'closed'}>{item.openNow?'● 營業中':'● 目前休息'}</span>}
   </div>}
-  {item.address&&<div className="place-detail-row"><MapPin size={16}/><div><b>{showAddress?item.address:shortAddress(item.address)}</b>{item.address!==shortAddress(item.address)&&<button onClick={()=>setShowAddress(!showAddress)}>{showAddress?'收合地址':'查看完整地址'}</button>}</div></div>}
+  {item.address&&<div className="place-detail-row"><MapPin size={16}/><div><b className={showAddress?'':'address-clamp'}>{showAddress?item.address:shortAddress(item.address)}</b>{item.address!==shortAddress(item.address)&&<button onClick={()=>setShowAddress(!showAddress)}>{showAddress?'收合地址':'查看完整地址'}</button>}</div></div>}
   {item.openingHours&&<div className="place-detail-row"><Clock3 size={16}/><div><b>{showHours?item.openingHours:todayHours(item.openingHours)}</b><button onClick={()=>setShowHours(!showHours)}>{showHours?'收合營業時間':'顯示完整營業時間'}</button></div></div>}
   {item.phone&&<a className="place-phone" href={`tel:${item.phone}`}><Phone size={16}/>{item.phone}</a>}
   <div className="place-map-actions">
@@ -733,7 +733,7 @@ function App(){
    <nav className="day-tabs" aria-label="每日行程分頁">{active.days.map((d,i)=><button key={d.id} className={current?.id===d.id?'active':''} onClick={()=>setTab(d.id)}><small>{d.date.slice(5)}</small><b>Day {i+1}</b></button>)}</nav>
    {current&&<section className="card day single-day"><div className="day-head"><div><small>{new Date(current.date+'T12:00:00').toLocaleDateString('zh-TW',{weekday:'long'})}</small><h2>{current.title}・{current.date.slice(5)}</h2></div>{!readOnly&&<button className="icon" onClick={()=>setItemEditor({dayId:current.id})}><Plus/></button>}</div>
     <div className="day-summary"><span>📌 {current.items.length} 個安排</span><span>🚉 {transportCount} 段交通</span><span>⏱ {totalDuration} 分鐘通勤</span></div>
-    <div className="timeline">{current.items.length?current.items.map((i,itemIndex)=><article className={`item ${i.type}`} key={i.id}><div className="time">{i.start}<span>～</span>{i.end}</div><div className="body"><div className="item-head"><div><small>{typeName[i.type].toUpperCase()}</small><h3>{i.title}</h3></div>{!readOnly&&<button className="mini-more" aria-label="更多功能" onClick={()=>setSmartMenu({dayId:current.id,item:i,index:itemIndex,total:current.items.length})}><MoreHorizontal size={18}/></button>}</div>{(i.type==='transport'||i.type==='flight')&&<TransportDetails item={i}/>} {(i.type==='place'||i.type==='meal'||i.type==='hotel')?<PlaceCardDetails item={i}/>:<>{i.address&&<p className="item-address"><MapPin size={14}/>{i.address}</p>}{i.openingHours&&<p className="item-hours"><Clock3 size={14}/>{i.openingHours}</p>}{i.rating!=null&&<p className="item-rating"><Star size={14}/> {i.rating}（{i.userRatingCount||0}）{i.openNow===true?'・營業中':i.openNow===false?'・目前休息':''}</p>}</>}{i.note&&i.type!=='note'&&<p>{i.note}</p>}{i.checks&&<div className="checks"><div className="note-heading"><StickyNote size={17}/>便條待辦</div>{i.checks.map(c=><label key={c.id}><input disabled={readOnly} type="checkbox" checked={c.done} onChange={()=>toggle(current.id,i.id,c.id)}/><span>{c.text}</span></label>)}</div>}
+    <div className="timeline">{current.items.length?current.items.map((i,itemIndex)=><article className={`item ${i.type}`} key={i.id}><div className="time">{i.start}<span>～</span>{i.end}</div><div className="body"><div className="item-head"><div><small>{typeName[i.type].toUpperCase()}</small><h3>{i.title}</h3></div>{!readOnly&&<button className="mini-more" aria-label="更多功能" onClick={()=>setSmartMenu({dayId:current.id,item:i,index:itemIndex,total:current.items.length})}><MoreHorizontal size={18}/></button>}</div>{(i.type==='transport'||i.type==='flight')&&<TransportDetails item={i}/>} {(i.type==='place'||i.type==='meal'||i.type==='hotel')?<PlaceCardDetails item={i}/>:<>{i.address&&<p className="item-address"><MapPin size={14}/>{i.address}</p>}{i.openingHours&&<p className="item-hours"><Clock3 size={14}/>{i.openingHours}</p>}{i.rating!=null&&<p className="item-rating"><Star size={14}/> {i.rating}（{i.userRatingCount||0}）{i.openNow===true?'・營業中':i.openNow===false?'・目前休息':''}</p>}</>}{i.note&&i.type!=='note'&&i.note.trim()!==i.address?.trim()&&<p>{i.note}</p>}{i.checks&&<div className="checks"><div className="note-heading"><StickyNote size={17}/>便條待辦</div>{i.checks.map(c=><label key={c.id}><input disabled={readOnly} type="checkbox" checked={c.done} onChange={()=>toggle(current.id,i.id,c.id)}/><span>{c.text}</span></label>)}</div>}
     </div></article>):<p className="empty">這一天還沒有行程，按右上角＋加入。</p>}</div>
     <div className="day-pager"><button className="btn" disabled={idx<=0} onClick={()=>setTab(active.days[idx-1]?.id)}><ChevronLeft size={18}/>前一天</button><span>{idx+1} / {active.days.length}</span><button className="btn" disabled={idx>=active.days.length-1} onClick={()=>setTab(active.days[idx+1]?.id)}>後一天<ChevronRight size={18}/></button></div>
    </section>}

@@ -408,3 +408,37 @@ form select{
   background:var(--paper);
   font-size:10px;
 }
+
+/* v2.6.3 — Compact Place Card */
+.smart-place-card{gap:7px}
+.place-photo-wrap{aspect-ratio:16/6;margin-bottom:2px}
+.place-title{color:var(--accent)!important}
+.place-category-badge{padding:3px 7px;font-size:9px}
+.place-badges{gap:5px}
+.place-badges span{padding:3px 6px;font-size:9px}
+.place-detail-row{gap:6px}
+.address-clamp{
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:2;
+  overflow:hidden;
+}
+.place-map-actions{gap:6px}
+.place-map-actions button{
+  min-height:32px;
+  padding:5px 7px;
+  font-size:9px;
+}
+.place-phone{font-size:10px}
+.place-photo-fallback,
+.place-photo-wrap.photo-error::after{display:none!important}
+.body:has(.smart-place-card){
+  padding-top:6px!important;
+  padding-bottom:7px!important;
+}
+.body:has(.smart-place-card)>h3,
+.body:has(.smart-place-card)>.item-address,
+.body:has(.smart-place-card)>.item-hours,
+.body:has(.smart-place-card)>.item-rating{
+  display:none!important;
+}
