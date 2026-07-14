@@ -1,5 +1,5 @@
 {
-  "name": "旅行手帳 Travel Planner Ultimate 2.8.2",
+  "name": "旅行手帳 Travel Planner Ultimate 2.8.3",
   "short_name": "旅行手帳",
   "start_url": "/",
   "display": "standalone",
@@ -20,5 +20,5 @@
       "purpose": "any maskable"
     }
   ],
-  "description": "航班卡即時狀態、航廈與重新整理功能"
+  "description": "航班倒數、報到提醒與行事曆匯出"
 }

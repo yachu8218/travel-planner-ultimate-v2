@@ -2,7 +2,7 @@ import React,{useEffect,useMemo,useState} from 'react'
 import ReactDOM from 'react-dom/client'
 import {
  Plus,Pencil,Copy,Trash2,ArrowLeft,Share2,FileDown,Upload,Palette,Clock3,Ruler,
- StickyNote,ChevronLeft,ChevronRight,House,CalendarDays,Compass,WalletCards,
+ StickyNote,ChevronLeft,ChevronRight,House,CalendarDays,CalendarPlus,Compass,WalletCards,
  Languages,UserRound,RefreshCw,Plane,MapPin,CloudSun,CheckCircle2,MoreHorizontal,
  ArrowUp,ArrowDown,X,Search,Navigation,Phone,Globe2,ImagePlus,Ticket,ReceiptText,Star,NotebookPen,Heart,HeartOff
 } from 'lucide-react'
@@ -919,15 +919,108 @@ const flightChecklistDefaults=[
  '確認航廈與登機門',
  '下載或截圖登機證'
 ]
+
+const flightDepartureDate=(item:Item)=>{
+ if(item.departureScheduled){
+  const d=new Date(item.departureScheduled)
+  if(!Number.isNaN(d.getTime()))return d
+ }
+ if(item.flightDate){
+  const [h,m]=(item.start||'00:00').split(':').map(Number)
+  const d=new Date(`${item.flightDate}T00:00:00`)
+  d.setHours(h||0,m||0,0,0)
+  return d
+ }
+ return null
+}
+const flightCountdown=(item:Item)=>{
+ const d=flightDepartureDate(item)
+ if(!d)return {label:'尚未設定日期',urgent:false,past:false,hours:0}
+ const diff=d.getTime()-Date.now()
+ const hours=Math.floor(diff/3600000)
+ const days=Math.floor(hours/24)
+ if(diff<0)return {label:'已過起飛時間',urgent:false,past:true,hours}
+ if(hours<6)return {label:`${Math.max(0,hours)} 小時內起飛`,urgent:true,past:false,hours}
+ if(days===0)return {label:`今天 ${item.start} 起飛`,urgent:true,past:false,hours}
+ if(days===1)return {label:`明天 ${item.start} 起飛`,urgent:true,past:false,hours}
+ return {label:`還有 ${days} 天出發`,urgent:false,past:false,hours}
+}
+const airportArrivalAdvice=(item:Item)=>{
+ const d=flightDepartureDate(item)
+ if(!d)return ''
+ const international=true
+ const hoursBefore=international?3:2
+ const arrive=new Date(d.getTime()-hoursBefore*3600000)
+ return `建議 ${arrive.toLocaleDateString('zh-TW',{month:'numeric',day:'numeric'})} ${arrive.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false})} 前抵達機場`
+}
+const checkInAdvice=(item:Item)=>{
+ const d=flightDepartureDate(item)
+ if(!d)return ''
+ const open=new Date(d.getTime()-48*3600000)
+ const close=new Date(d.getTime()-90*60000)
+ return `線上報到建議：${open.toLocaleDateString('zh-TW',{month:'numeric',day:'numeric'})} ${open.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false})} 起，最晚起飛前 90 分鐘完成`
+}
+const downloadFlightICS=(item:Item)=>{
+ const start=flightDepartureDate(item)
+ if(!start){alert('這筆航班缺少日期或時間。');return}
+ let end:Date
+ if(item.arrivalScheduled){
+  end=new Date(item.arrivalScheduled)
+  if(Number.isNaN(end.getTime()))end=new Date(start.getTime()+(item.durationMin||180)*60000)
+ }else{
+  const [eh,em]=(item.end||'00:00').split(':').map(Number)
+  end=new Date(start)
+  end.setHours(eh||0,em||0,0,0)
+  if(end<=start)end.setDate(end.getDate()+1)
+ }
+ const fmt=(d:Date)=>d.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z')
+ const esc=(s='')=>s.replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;')
+ const desc=[
+  item.flightStatus&&`狀態：${flightStatusLabel(item.flightStatus)}`,
+  item.departureTerminal&&`出發航廈：${item.departureTerminal}`,
+  item.departureGate&&`登機門：${item.departureGate}`,
+  item.arrivalTerminal&&`抵達航廈：${item.arrivalTerminal}`,
+  item.baggageBelt&&`行李轉盤：${item.baggageBelt}`,
+  item.aircraftModel&&`機型：${item.aircraftModel}`
+ ].filter(Boolean).join('\n')
+ const ics=[
+  'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Travel Planner Ultimate//Flight//ZH-TW',
+  'CALSCALE:GREGORIAN','BEGIN:VEVENT',
+  `UID:${item.id}@travel-planner`,
+  `DTSTAMP:${fmt(new Date())}`,
+  `DTSTART:${fmt(start)}`,
+  `DTEND:${fmt(end)}`,
+  `SUMMARY:${esc(`${item.airline||''} ${item.flightNo||item.title}`.trim())}`,
+  `LOCATION:${esc(`${item.from||''} → ${item.to||''}`)}`,
+  `DESCRIPTION:${esc(desc)}`,
+  'BEGIN:VALARM','TRIGGER:-PT3H','ACTION:DISPLAY','DESCRIPTION:請準備前往機場','END:VALARM',
+  'END:VEVENT','END:VCALENDAR'
+ ].join('\r\n')
+ const blob=new Blob([ics],{type:'text/calendar;charset=utf-8'})
+ const url=URL.createObjectURL(blob)
+ const a=document.createElement('a')
+ a.href=url
+ a.download=`${item.flightNo||'flight'}-${item.flightDate||'schedule'}.ics`
+ a.click()
+ setTimeout(()=>URL.revokeObjectURL(url),1000)
+}
+
 function FlightCardDetails({item,onRefresh,refreshing}:{item:Item;onRefresh?:()=>void;refreshing?:boolean}){
  const status=flightStatusLabel(item.flightStatus)
  const updated=item.flightUpdatedAt?new Date(item.flightUpdatedAt).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}):''
  const depCode=item.from?.match(/\b[A-Z]{3}\b/)?.[0]||item.from?.split(' ').at(-1)||'—'
  const arrCode=item.to?.match(/\b[A-Z]{3}\b/)?.[0]||item.to?.split(' ').at(-1)||'—'
+ const countdown=flightCountdown(item)
+ const checks=item.checks||[]
+ const done=checks.filter(c=>c.done).length
  return <div className="saved-flight-card">
   <div className="saved-flight-top">
    <div><span>{item.airline||'航班'}</span><h3>{item.flightNo||item.title}</h3></div>
    <span className={`saved-flight-status ${flightStatusClass(item.flightStatus)}`}>{status}</span>
+  </div>
+  <div className={`flight-reminder-strip ${countdown.urgent?'urgent':''} ${countdown.past?'past':''}`}>
+   <div><CalendarDays size={16}/><b>{countdown.label}</b></div>
+   <small>{airportArrivalAdvice(item)}</small>
   </div>
   <div className="saved-flight-route">
    <div>
@@ -948,9 +1041,17 @@ function FlightCardDetails({item,onRefresh,refreshing}:{item:Item;onRefresh?:()=
    {item.aircraftModel&&<span><b>機型</b>{item.aircraftModel}</span>}
    {item.aircraftRegistration&&<span><b>機身</b>{item.aircraftRegistration}</span>}
   </div>
+  {checks.length>0&&<div className="flight-check-progress">
+   <div><span>登機前準備</span><b>{done}/{checks.length}</b></div>
+   <div className="flight-progress-track"><i style={{width:`${checks.length?done/checks.length*100:0}%`}}/></div>
+   <small>{checkInAdvice(item)}</small>
+  </div>}
+  <div className="saved-flight-actions">
+   <button onClick={()=>downloadFlightICS(item)}><CalendarPlus size={15}/>加入行事曆</button>
+   {onRefresh&&item.flightNo&&item.flightDate&&<button onClick={onRefresh} disabled={refreshing}>{refreshing?<RefreshCw className="spin" size={15}/>:<RefreshCw size={15}/>}更新航班</button>}
+  </div>
   <div className="saved-flight-footer">
    <small>{updated?`更新於 ${updated}`:item.flightSource||'手動資料'}</small>
-   {onRefresh&&item.flightNo&&item.flightDate&&<button onClick={onRefresh} disabled={refreshing}>{refreshing?<RefreshCw className="spin" size={15}/>:<RefreshCw size={15}/>}更新航班</button>}
   </div>
  </div>
 }
@@ -1101,6 +1202,7 @@ function App(){
   const dateProgress=Date.now()<new Date(active.start+'T00:00:00').getTime()?0:Date.now()>new Date(active.end+'T23:59:59').getTime()?100:Math.round(((Date.now()-new Date(active.start+'T00:00:00').getTime())/(new Date(active.end+'T23:59:59').getTime()-new Date(active.start+'T00:00:00').getTime()))*100)
   const completion=checkCount?Math.round(checkedCount/checkCount*100):dateProgress
   const nextFlight=allItems.find(i=>i.type==='flight')
+ const nextFlightCountdown=nextFlight?flightCountdown(nextFlight):null
 
   const itinerary=<>
    <nav className="day-tabs" aria-label="每日行程分頁">{active.days.map((d,i)=><button key={d.id} className={current?.id===d.id?'active':''} onClick={()=>setTab(d.id)}><small>{d.date.slice(5)}</small><b>Day {i+1}</b></button>)}</nav>
@@ -1121,7 +1223,7 @@ function App(){
      <section className="control-grid">
       <article className="card control-card hero-control"><small>NEXT TRIP</small><h3>{daysUntil>0?`距離出發還有 ${daysUntil} 天`:daysUntil===0?'今天出發':'旅程進行中／已完成'}</h3><div className="progress"><i style={{width:`${Math.min(100,Math.max(4,completion))}%`}}/></div><span>旅行進度 {completion}%・共 {active.days.length} Days</span></article>
       <article className="card control-card today-card"><CalendarDays size={25}/><small>TODAY PLAN</small><h3>{todayDay?`Day ${todayIndex+1}・${todayDay.date.slice(5)}`:'尚未建立日期'}</h3><span>{todayDay?.items.length||0} 個安排</span><button className="inline-link" onClick={()=>{setTab(todayDay?.id||active.days[0]?.id);setPage('itinerary')}}>查看今日行程 →</button></article>
-      <article className="card control-card"><Plane size={25}/><small>航班資訊</small><h3>{nextFlight?.flightNo||'尚未加入航班'}</h3><span>{nextFlight?`${nextFlight.start} → ${nextFlight.end}・${flightStatusLabel(nextFlight.flightStatus)}`:'可查詢或手動建立航班卡'}</span><button className="inline-link" onClick={()=>setFlightOpen(true)}>開啟航班中心 →</button></article>
+      <article className={`card control-card flight-home-card ${nextFlightCountdown?.urgent?'urgent':''}`}><Plane size={25}/><small>最近航班</small><h3>{nextFlight?.flightNo||'尚未加入航班'}</h3><span>{nextFlight?`${nextFlight.start} → ${nextFlight.end}・${flightStatusLabel(nextFlight.flightStatus)}`:'可查詢或手動建立航班卡'}</span>{nextFlightCountdown&&<b className="home-flight-countdown">{nextFlightCountdown.label}</b>}<button className="inline-link" onClick={()=>setFlightOpen(true)}>開啟航班中心 →</button></article>
       <article className="card control-card"><WalletCards size={25}/><small>旅行錢包</small><h3>{active.currency}</h3><span>即時匯率、預算與旅伴分帳</span><button className="inline-link" onClick={()=>setPage('wallet')}>開啟旅行錢包 →</button></article>
      </section>
      <Weather trip={active}/>
