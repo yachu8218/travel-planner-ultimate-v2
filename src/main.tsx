@@ -135,42 +135,85 @@ function ItemForm({initial,onSave,onClose,trip}:{initial?:Item,onSave:(x:Item)=>
   const timer=setTimeout(async()=>{
    setSuggestLoading(true)
    try{
-    const q=[v.title,trip?.destination].filter(Boolean).join(' ')
-    const r=await fetch(`/api/places?q=${encodeURIComponent(q)}&language=${encodeURIComponent(trip?.locale||'zh-TW')}&mode=autocomplete`)
+    const destination=trip?.destination||''
+    const aliases:Record<string,string>={'釜山':'부산','首爾':'서울','濟州':'제주','大邱':'대구','仁川':'인천'}
+    const q=[v.title,aliases[destination]||destination].filter(Boolean).join(' ')
+    const r=await fetch(`/api/places?q=${encodeURIComponent(q)}&language=${encodeURIComponent(trip?.locale||'zh-TW')}&destination=${encodeURIComponent(destination)}&mode=autocomplete`)
     const j=await r.json()
-    if(r.ok&&Array.isArray(j.results)){
+    if(r.ok&&Array.isArray(j.results)&&j.results.length){
      setPlaceResults(j.results)
-     setShowSuggestions(j.results.length>0)
+     setShowSuggestions(true)
+     setPlaceMessage('')
+    }else if(j.configured===false){
+     setPlaceMessage('Google Places 金鑰尚未在目前部署生效；仍可按下方按鈕使用備援搜尋。')
     }
    }catch{}
    finally{setSuggestLoading(false)}
-  },450)
+  },550)
   return()=>clearTimeout(timer)
  },[v.title,trip?.destination,trip?.locale,isPlace])
 
+ const destinationAlias=(value='')=>{
+  const pairs:Record<string,string>={
+   '釜山':'부산','首爾':'서울','濟州':'제주','大邱':'대구','仁川':'인천',
+   '東京':'東京','大阪':'大阪','京都':'京都','福岡':'福岡','沖繩':'沖縄',
+   '曼谷':'กรุงเทพ','巴黎':'Paris','倫敦':'London'
+  }
+  return pairs[value]||value
+ }
+ const placeQueries=()=>{
+  const title=v.title.trim(),destination=trip?.destination?.trim()||''
+  return Array.from(new Set([
+   [title,destinationAlias(destination)].filter(Boolean).join(' '),
+   [title,destination].filter(Boolean).join(' '),
+   title
+  ].filter(Boolean)))
+ }
  const searchPlace=async()=>{
   if(!v.title.trim()){setPlaceMessage('請先輸入店名或景點名稱。');return}
-  setPlaceLoading(true);setPlaceMessage('');setPlaceResults([])
-  const q=[v.title,trip?.destination].filter(Boolean).join(' ')
+  setPlaceLoading(true);setPlaceMessage('正在確認 Google Places 設定…');setPlaceResults([]);setShowSuggestions(false)
+  const queries=placeQueries()
+  let apiMessage=''
   try{
-   const r=await fetch(`/api/places?q=${encodeURIComponent(q)}&language=${encodeURIComponent(trip?.locale||'zh-TW')}`)
-   const j=await r.json()
-   if(r.ok&&Array.isArray(j.results)&&j.results.length){
-    setPlaceResults(j.results)
-    setPlaceMessage(j.configured?'使用 Google Places 搜尋，請選擇正確店家或分店。':'使用免費地址資料搜尋。')
-    return
+   for(const q of queries){
+    const r=await fetch(`/api/places?q=${encodeURIComponent(q)}&language=${encodeURIComponent(trip?.locale||'zh-TW')}&destination=${encodeURIComponent(trip?.destination||'')}`)
+    const j=await r.json()
+    apiMessage=j.message||apiMessage
+    if(r.ok&&Array.isArray(j.results)&&j.results.length){
+     setPlaceResults(j.results)
+     setShowSuggestions(true)
+     setPlaceMessage(j.configured?`已使用 Google Places 找到 ${j.results.length} 筆結果，請選擇正確分店。`:'使用免費地址資料搜尋。')
+     setPlaceLoading(false)
+     return
+    }
+    if(j.configured===false){
+     apiMessage='Cloudflare 尚未讀取到 GOOGLE_PLACES_API_KEY。請確認 Secret 設在 Production，並完成一次新部署。'
+     break
+    }
    }
-   if(j.message)setPlaceMessage(j.message)
-  }catch{}
+  }catch{
+   apiMessage='無法連線到 Cloudflare 地點搜尋功能。'
+  }
+  setPlaceMessage(apiMessage||'Google Places 沒有找到結果，正在改用免費地址搜尋…')
   try{
-   const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&accept-language=zh-TW,zh,en,ko,ja&q=${encodeURIComponent(q)}`,{headers:{Accept:'application/json'}})
-   if(!r.ok)throw new Error()
-   const j=await r.json()
-   setPlaceResults(j.map((p:PlaceResult)=>({...p,source:'OpenStreetMap'})))
-   if(!j.length)setPlaceMessage('找不到符合結果，可改用 Google Maps 或 Naver Map 搜尋。')
-   else setPlaceMessage('目前使用免費地址資料；設定 Google Places 金鑰後可取得營業時間、電話與評分。')
-  }catch{setPlaceMessage('目前無法搜尋地點，仍可手動輸入地址。')}
-  finally{setPlaceLoading(false)}
+   for(const q of queries){
+    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&accept-language=zh-TW,zh,en,ko,ja&q=${encodeURIComponent(q)}`,{headers:{Accept:'application/json'}})
+    if(!r.ok)continue
+    const j=await r.json()
+    if(Array.isArray(j)&&j.length){
+     setPlaceResults(j.map((p:PlaceResult)=>({...p,source:'OpenStreetMap'})))
+     setShowSuggestions(true)
+     setPlaceMessage(`Google Places 未取得結果，目前顯示免費地址搜尋的 ${j.length} 筆結果。`)
+     setPlaceLoading(false)
+     return
+    }
+   }
+   setPlaceMessage(`${apiMessage?apiMessage+' ':''}仍找不到符合店家。建議輸入完整店名、分店名或城市，例如「다담 부산」。`)
+  }catch{
+   setPlaceMessage(`${apiMessage?apiMessage+' ':''}免費地址搜尋也暫時無法使用，可先手動輸入地址。`)
+  }finally{
+   setPlaceLoading(false)
+  }
  }
  const choosePlace=(p:PlaceResult)=>{
   setV({...v,

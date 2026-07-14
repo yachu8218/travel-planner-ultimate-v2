@@ -1,13 +1,12 @@
 Travel Planner Ultimate
-Version: 2.6.0 — Google Places 智慧搜尋整合
+Version: 2.6.1 — Search & Form Fix
 
-新增：
-- 店名輸入後自動顯示即時建議
-- 依目的地提高搜尋精準度
-- 選擇店家後自動帶入正式名稱、地址、營業時間、電話、網站、評分與營業狀態
-- 同名店家與分店清單
-- Google Places 失敗時保留免費地址搜尋備援
-- 行程卡顯示地址、營業時間與評分
-
-Cloudflare Secret：
-GOOGLE_PLACES_API_KEY
+修正：
+- Google Places 搜尋顯示實際設定狀態
+- Secret 未在 Production 生效時提供明確提示
+- 韓國目的地自動加入韓文城市名稱
+- 依序嘗試店名＋城市、店名＋原目的地、只搜尋店名
+- 免費地址搜尋同步採用多組關鍵字
+- 交通方式下拉選單高度增加
+- 修正 iPhone 上文字與 Emoji 被裁切
+- 所有下拉選單統一高度與內距

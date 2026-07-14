@@ -1,24 +1,15 @@
-# Travel Planner Ultimate v2.6.0 — Google Places 智慧搜尋整合
+# Travel Planner Ultimate v2.6.1 — Search & Form Fix
 
-## 新增功能
-在新增景點、餐廳、甜點或住宿時，輸入至少兩個字，App 會自動顯示 Google Places 建議清單。
+## 地點搜尋
+搜尋失敗時會清楚顯示：
+- Cloudflare 是否讀取到 `GOOGLE_PLACES_API_KEY`
+- Google Places 是否回傳錯誤
+- 是否正在使用免費地址搜尋
 
-選擇正確店家後，自動帶入：
-- 正式名稱
-- 地址
-- 營業時間
-- 目前是否營業
-- 電話
-- 官方網站
-- Google 評分與評價數量
+韓國旅行會把釜山、首爾等中文目的地轉成韓文城市名稱後搜尋，並依序嘗試多種關鍵字。
 
-Google Places 無法使用或尚未設定金鑰時，仍可按「重新搜尋完整資料」，系統會退回免費地址搜尋。
+## 表單修正
+交通方式與其他下拉選單高度改為 52px，修正 iPhone Safari 文字及 Emoji 被裁切。
 
-## Cloudflare
-需設定 Secret：
-
-```text
-GOOGLE_PLACES_API_KEY
-```
-
-更新 ZIP 覆蓋 GitHub 後 Commit，Cloudflare Pages 會自動部署。
+## 更新
+解壓縮後覆蓋 GitHub 原檔案並 Commit，Cloudflare Pages 會自動部署。
