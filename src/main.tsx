@@ -4,7 +4,7 @@ import {
  Plus,Pencil,Copy,Trash2,ArrowLeft,Share2,FileDown,Upload,Palette,Clock3,Ruler,
  StickyNote,ChevronLeft,ChevronRight,House,CalendarDays,Compass,WalletCards,
  Languages,UserRound,RefreshCw,Plane,MapPin,CloudSun,CheckCircle2,MoreHorizontal,
- ArrowUp,ArrowDown,X,Search
+ ArrowUp,ArrowDown,X,Search,Navigation,Phone,Globe2,ImagePlus,Ticket,ReceiptText,Star,NotebookPen
 } from 'lucide-react'
 import './styles.css'
 
@@ -16,7 +16,8 @@ type Check={id:string,text:string,done:boolean}
 type Item={
  id:string,type:TType,start:string,end:string,title:string,note?:string,checks?:Check[],
  transportMode?:TransportMode,from?:string,to?:string,durationMin?:number,distanceKm?:number,
- line?:string,flightNo?:string
+ line?:string,flightNo?:string,address?:string,openingHours?:string,phone?:string,website?:string,
+ lat?:number,lon?:number
 }
 type Day={id:string,date:string,title:string,items:Item[]}
 type Traveler={id:string;name:string}
@@ -28,7 +29,7 @@ type Trip={
 }
 type State={version:2,active:string|null,trips:Trip[]}
 type WeatherDay={date:string,code:number,max:number,min:number,rain:number}
-type PlaceResult={place_id:string;display_name:string;lat:string;lon:string}
+type PlaceResult={place_id:string;display_name:string;lat:string;lon:string;type?:string;class?:string}
 type TranslationFavorite={id:string;source:string;translated:string;locale:string}
 type FlightResult={flightNo:string;airline?:string;status?:string;departure:{airport?:string;iata?:string;terminal?:string;gate?:string;scheduled?:string};arrival:{airport?:string;iata?:string;terminal?:string;gate?:string;baggage?:string;scheduled?:string};aircraft?:string;durationMin?:number;source?:string}
 
@@ -104,15 +105,38 @@ function Form({trip,onSave,onClose}:{trip?:Trip,onSave:(v:any)=>void,onClose:()=
  </ModalShell>
 }
 
-function ItemForm({initial,onSave,onClose}:{initial?:Item,onSave:(x:Item)=>void,onClose:()=>void}){
+function ItemForm({initial,onSave,onClose,trip}:{initial?:Item,onSave:(x:Item)=>void,onClose:()=>void,trip?:Trip}){
  const [v,setV]=useState({
   type:initial?.type||'place' as TType,start:initial?.start||'09:00',end:initial?.end||'10:00',
   title:initial?.title||'',note:initial?.note||(initial?.checks||[]).map(c=>c.text).join('\n'),
   transportMode:initial?.transportMode||'metro' as TransportMode,from:initial?.from||'',to:initial?.to||'',
   durationMin:initial?.durationMin?.toString()||'',distanceKm:initial?.distanceKm?.toString()||'',
-  line:initial?.line||'',flightNo:initial?.flightNo||''
+  line:initial?.line||'',flightNo:initial?.flightNo||'',address:initial?.address||'',
+  openingHours:initial?.openingHours||'',phone:initial?.phone||'',website:initial?.website||'',
+  lat:initial?.lat,lon:initial?.lon
  })
+ const [placeLoading,setPlaceLoading]=useState(false)
+ const [placeResults,setPlaceResults]=useState<PlaceResult[]>([])
+ const [placeMessage,setPlaceMessage]=useState('')
  const isTransport=v.type==='transport'||v.type==='flight'
+ const isPlace=v.type==='place'||v.type==='meal'||v.type==='hotel'
+ const searchPlace=async()=>{
+  if(!v.title.trim()){setPlaceMessage('請先輸入店名或景點名稱。');return}
+  setPlaceLoading(true);setPlaceMessage('');setPlaceResults([])
+  try{
+   const q=[v.title,trip?.destination].filter(Boolean).join(' ')
+   const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&accept-language=zh-TW,zh,en,ko,ja&q=${encodeURIComponent(q)}`,{headers:{Accept:'application/json'}})
+   if(!r.ok)throw new Error()
+   const j=await r.json()
+   setPlaceResults(j)
+   if(!j.length)setPlaceMessage('找不到符合結果，可改用 Google Maps 或 Naver Map 搜尋。')
+  }catch{setPlaceMessage('目前無法搜尋地點，仍可手動輸入地址。')}
+  finally{setPlaceLoading(false)}
+ }
+ const choosePlace=(p:PlaceResult)=>{
+  setV({...v,address:p.display_name,lat:Number(p.lat),lon:Number(p.lon)})
+  setPlaceResults([]);setPlaceMessage('已帶入地址。營業時間可先手動填寫，完整自動資料將於 Places API 串接後啟用。')
+ }
  return <ModalShell title={initial?'編輯行程':'加入時間軸'} onClose={onClose}>
   <form onSubmit={e=>{e.preventDefault();onSave({
    id:initial?.id||id(),type:v.type,start:v.start,end:v.end,title:v.title,note:v.note,
@@ -120,13 +144,24 @@ function ItemForm({initial,onSave,onClose}:{initial?:Item,onSave:(x:Item)=>void,
    from:isTransport?v.from:undefined,to:isTransport?v.to:undefined,
    durationMin:v.durationMin?Number(v.durationMin):undefined,distanceKm:v.distanceKm?Number(v.distanceKm):undefined,
    line:isTransport?v.line:undefined,flightNo:v.type==='flight'?v.flightNo:undefined,
+   address:isPlace?v.address:undefined,openingHours:isPlace?v.openingHours:undefined,
+   phone:isPlace?v.phone:undefined,website:isPlace?v.website:undefined,
+   lat:isPlace?v.lat:undefined,lon:isPlace?v.lon:undefined,
    checks:v.type==='note'?v.note.split('\n').filter(Boolean).map((text,i)=>({id:initial?.checks?.[i]?.id||id(),text,done:initial?.checks?.[i]?.done||false})):undefined
   })}}>
    <label>行程類型<select value={v.type} onChange={e=>setV({...v,type:e.target.value as TType})}><option value="place">景點</option><option value="meal">餐廳／甜點</option><option value="hotel">住宿</option><option value="transport">交通</option><option value="flight">飛機</option><option value="note">便條紙</option></select></label>
    <div className="two"><label>開始時間<div className="date-time-field"><Clock3 size={18}/><input type="time" value={v.start} onChange={e=>setV({...v,start:e.target.value})}/></div></label><label>結束時間<div className="date-time-field"><Clock3 size={18}/><input type="time" value={v.end} onChange={e=>setV({...v,end:e.target.value})}/></div></label></div>
    {v.type==='transport'&&<label>交通方式<select value={v.transportMode} onChange={e=>setV({...v,transportMode:e.target.value as TransportMode})}>{Object.entries(modeLabel).filter(([k])=>k!=='flight').map(([k,label])=><option key={k} value={k}>{modeEmoji[k as TransportMode]} {label}</option>)}</select></label>}
    {isTransport&&<><div className="two"><label>出發地<input value={v.from} onChange={e=>setV({...v,from:e.target.value})} placeholder="例如：海雲台站"/></label><label>抵達地<input value={v.to} onChange={e=>setV({...v,to:e.target.value})} placeholder="例如：西面站"/></label></div><div className="two"><label>通勤時間（分鐘）<input type="number" min="0" value={v.durationMin} onChange={e=>setV({...v,durationMin:e.target.value})}/></label><label>距離（公里）<input type="number" min="0" step="0.1" value={v.distanceKm} onChange={e=>setV({...v,distanceKm:e.target.value})}/></label></div><label>{v.type==='flight'?'航班號碼':'路線／車次'}<input value={v.type==='flight'?v.flightNo:v.line} onChange={e=>v.type==='flight'?setV({...v,flightNo:e.target.value.toUpperCase()}):setV({...v,line:e.target.value})} placeholder={v.type==='flight'?'例如：KE2086':'例如：2號線、KTX 105'}/></label></>}
-   <label>標題<input required value={v.title} onChange={e=>setV({...v,title:e.target.value})} placeholder={v.type==='note'?'例如：機場待辦':v.type==='transport'?'例如：前往飯店':'輸入行程名稱'}/></label>
+   <label>標題<input required value={v.title} onChange={e=>setV({...v,title:e.target.value})} placeholder={v.type==='note'?'例如：機場待辦':v.type==='transport'?'例如：前往飯店':'輸入店名或景點名稱'}/></label>
+   {isPlace&&<section className="place-enrich">
+    <button type="button" className="btn full" onClick={searchPlace} disabled={placeLoading}>{placeLoading?<><RefreshCw className="spin" size={17}/>搜尋中</>:<><Search size={17}/>搜尋地點資料</>}</button>
+    {placeMessage&&<p className="place-message">{placeMessage}</p>}
+    {placeResults.length>0&&<div className="place-pick-list">{placeResults.map(p=><button type="button" key={p.place_id} onClick={()=>choosePlace(p)}><MapPin size={17}/><span>{p.display_name}</span></button>)}</div>}
+    <label>地址<input value={v.address} onChange={e=>setV({...v,address:e.target.value})} placeholder="搜尋後可自動帶入，亦可手動輸入"/></label>
+    <label>營業時間<input value={v.openingHours} onChange={e=>setV({...v,openingHours:e.target.value})} placeholder="例如：每日 11:30–22:00"/></label>
+    <div className="two"><label>電話<input value={v.phone} onChange={e=>setV({...v,phone:e.target.value})} placeholder="選填"/></label><label>官方網站<input value={v.website} onChange={e=>setV({...v,website:e.target.value})} placeholder="選填"/></label></div>
+   </section>}
    <label>{v.type==='note'?'待辦內容（每行一項）':'備註'}<textarea rows={5} value={v.note} onChange={e=>setV({...v,note:e.target.value})}/></label>
    <div className="sticky-actions"><button type="button" className="btn" onClick={onClose}>取消</button><button className="btn primary">{initial?'儲存修改':'加入行程'}</button></div>
   </form>
@@ -435,6 +470,29 @@ function TransitCenter({trip,onAdd}:{trip:Trip,onAdd:(item:Item)=>void}){
  return <section className="transit-center"><article className="card transit-hero"><div className="feature-head"><div><small>SMART TRANSIT</small><h2>智慧交通中心</h2></div><span>{modeEmoji[mode]}</span></div><p>建立交通卡後可直接加入目前 Day，並可開啟地圖導航。</p></article><article className="card transit-builder"><label>交通方式<select value={mode} onChange={e=>setMode(e.target.value as TransportMode)}>{Object.entries(modeLabel).map(([k,v])=><option key={k} value={k}>{modeEmoji[k as TransportMode]} {v}</option>)}</select></label><div className="transit-two"><label>出發地<input value={from} onChange={e=>setFrom(e.target.value)} placeholder="例如：西面站"/></label><label>抵達地<input value={to} onChange={e=>setTo(e.target.value)} placeholder="例如：海雲台站"/></label></div><div className="transit-two"><label>開始時間<div className="date-time-field"><Clock3 size={18}/><input type="time" value={start} onChange={e=>setStart(e.target.value)}/></div></label><label>結束時間<div className="date-time-field"><Clock3 size={18}/><input type="time" value={end} onChange={e=>setEnd(e.target.value)}/></div></label></div><div className="transit-three"><label>時間（分鐘）<input type="number" min="0" value={duration} onChange={e=>setDuration(e.target.value)}/></label><label>距離（公里）<input type="number" min="0" step="0.1" value={distance} onChange={e=>setDistance(e.target.value)}/></label><label>費用（{trip.currency}）<input type="number" min="0" value={fare} onChange={e=>setFare(e.target.value)}/></label></div><label>路線／車次<input value={line} onChange={e=>setLine(e.target.value)} placeholder="例如：2號線、KTX 105"/></label><label>備註<textarea rows={3} value={note} onChange={e=>setNote(e.target.value)} placeholder="月台、出口、轉乘或集合資訊"/></label><div className="transit-actions"><button className="btn" onClick={g} disabled={!from||!to}>Google Maps</button><button className="btn" onClick={n} disabled={!from||!to}>Naver Map</button><button className="btn primary" onClick={add}><Plus size={17}/>加入目前 Day</button></div></article></section>
 }
 
+function SmartItemMenu({item,index,total,onClose,onEdit,onCopy,onUp,onDown,onDelete}:{item:Item,index:number,total:number,onClose:()=>void,onEdit:()=>void,onCopy:()=>void,onUp:()=>void,onDown:()=>void,onDelete:()=>void}){
+ const isPlace=item.type==='place'||item.type==='meal'||item.type==='hotel'
+ const isFlight=item.type==='flight'
+ const query=item.address||item.title
+ const openGoogle=()=>window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`,'_blank')
+ const openNaver=()=>window.open(`https://map.naver.com/p/search/${encodeURIComponent(query)}`,'_blank')
+ const openWebsite=()=>item.website&&window.open(item.website.startsWith('http')?item.website:`https://${item.website}`,'_blank')
+ const call=()=>item.phone&&(location.href=`tel:${item.phone}`)
+ return <ModalShell title={item.title} onClose={onClose}>
+  <div className="smart-menu">
+   {isPlace&&<><button onClick={openGoogle}><Navigation/>Google Maps 導航</button><button onClick={openNaver}><Compass/>Naver Map 搜尋</button>{item.phone&&<button onClick={call}><Phone/>撥打店家電話</button>}{item.website&&<button onClick={openWebsite}><Globe2/>開啟官方網站</button>}<button onClick={onEdit}><RefreshCw/>更新地址與營業時間</button><button><Star/>收藏景點</button><button><ImagePlus/>加入照片</button><button><ReceiptText/>記錄消費</button><button><Ticket/>加入票券</button></>}
+   {isFlight&&<><button onClick={onEdit}><Plane/>航班與航廈資訊</button><button><Ticket/>加入登機證</button><button><NotebookPen/>行李與座位備註</button></>}
+   {!isPlace&&!isFlight&&<button onClick={onEdit}><NotebookPen/>查看與編輯詳細資料</button>}
+   <div className="smart-menu-divider"/>
+   <button onClick={onEdit}><Pencil/>編輯</button>
+   <button onClick={onCopy}><Copy/>複製到目前 Day</button>
+   <button disabled={index===0} onClick={onUp}><ArrowUp/>上移</button>
+   <button disabled={index===total-1} onClick={onDown}><ArrowDown/>下移</button>
+   <button className="danger" onClick={onDelete}><Trash2/>刪除</button>
+  </div>
+ </ModalShell>
+}
+
 function TransportDetails({item}:{item:Item}){
  const m=item.transportMode||'metro'
  return <div className="transport-card"><div className="transport-title"><span>{modeEmoji[m]}</span><b>{modeLabel[m]}</b>{item.flightNo&&<strong>{item.flightNo}</strong>}{item.line&&<strong>{item.line}</strong>}</div>{(item.from||item.to)&&<div className="route"><span>{item.from||'出發地'}</span><b>→</b><span>{item.to||'抵達地'}</span></div>}<div className="transport-meta">{item.durationMin!=null&&<span><Clock3 size={15}/>{item.durationMin} 分鐘</span>}{item.distanceKm!=null&&<span><Ruler size={15}/>{item.distanceKm} 公里</span>}</div></div>
@@ -462,6 +520,7 @@ function App(){
  const [page,setPage]=useState<AppPage>('home')
  const [flightOpen,setFlightOpen]=useState(false)
  const [transitOpen,setTransitOpen]=useState(false)
+ const [smartMenu,setSmartMenu]=useState<{dayId:string,item:Item,index:number,total:number}|null>(null)
  const [weatherOpen,setWeatherOpen]=useState(false)
  const active=s.trips.find(t=>t.id===s.active)||null
  const update=(n:State)=>{setS(n);if(!readOnly)save(n)}
@@ -524,8 +583,8 @@ function App(){
    <nav className="day-tabs" aria-label="每日行程分頁">{active.days.map((d,i)=><button key={d.id} className={current?.id===d.id?'active':''} onClick={()=>setTab(d.id)}><small>{d.date.slice(5)}</small><b>Day {i+1}</b></button>)}</nav>
    {current&&<section className="card day single-day"><div className="day-head"><div><small>{new Date(current.date+'T12:00:00').toLocaleDateString('zh-TW',{weekday:'long'})}</small><h2>{current.title}・{current.date.slice(5)}</h2></div>{!readOnly&&<button className="icon" onClick={()=>setItemEditor({dayId:current.id})}><Plus/></button>}</div>
     <div className="day-summary"><span>📌 {current.items.length} 個安排</span><span>🚉 {transportCount} 段交通</span><span>⏱ {totalDuration} 分鐘通勤</span></div>
-    <div className="timeline">{current.items.length?current.items.map((i,itemIndex)=><article className={`item ${i.type}`} key={i.id}><div className="time">{i.start}<span>～</span>{i.end}</div><div className="body"><div className="item-head"><div><small>{typeName[i.type].toUpperCase()}</small><h3>{i.title}</h3></div>{!readOnly&&<button className="mini-more" aria-label="編輯行程"><MoreHorizontal size={18}/></button>}</div>{(i.type==='transport'||i.type==='flight')&&<TransportDetails item={i}/>} {i.note&&i.type!=='note'&&<p>{i.note}</p>}{i.checks&&<div className="checks"><div className="note-heading"><StickyNote size={17}/>便條待辦</div>{i.checks.map(c=><label key={c.id}><input disabled={readOnly} type="checkbox" checked={c.done} onChange={()=>toggle(current.id,i.id,c.id)}/><span>{c.text}</span></label>)}</div>}
-    {!readOnly&&<div className="item-actions"><button onClick={()=>setItemEditor({dayId:current.id,item:i})}><Pencil size={15}/>編輯</button><button onClick={()=>itemAction(current.id,i.id,'copy')}><Copy size={15}/>複製</button><button disabled={itemIndex===0} onClick={()=>itemAction(current.id,i.id,'up')}><ArrowUp size={15}/></button><button disabled={itemIndex===current.items.length-1} onClick={()=>itemAction(current.id,i.id,'down')}><ArrowDown size={15}/></button><button className="danger" onClick={()=>itemAction(current.id,i.id,'delete')}><Trash2 size={15}/></button></div>}</div></article>):<p className="empty">這一天還沒有行程，按右上角＋加入。</p>}</div>
+    <div className="timeline">{current.items.length?current.items.map((i,itemIndex)=><article className={`item ${i.type}`} key={i.id}><div className="time">{i.start}<span>～</span>{i.end}</div><div className="body"><div className="item-head"><div><small>{typeName[i.type].toUpperCase()}</small><h3>{i.title}</h3></div>{!readOnly&&<button className="mini-more" aria-label="更多功能" onClick={()=>setSmartMenu({dayId:current.id,item:i,index:itemIndex,total:current.items.length})}><MoreHorizontal size={18}/></button>}</div>{(i.type==='transport'||i.type==='flight')&&<TransportDetails item={i}/>} {i.address&&<p className="item-address"><MapPin size={14}/>{i.address}</p>}{i.openingHours&&<p className="item-hours"><Clock3 size={14}/>{i.openingHours}</p>}{i.note&&i.type!=='note'&&<p>{i.note}</p>}{i.checks&&<div className="checks"><div className="note-heading"><StickyNote size={17}/>便條待辦</div>{i.checks.map(c=><label key={c.id}><input disabled={readOnly} type="checkbox" checked={c.done} onChange={()=>toggle(current.id,i.id,c.id)}/><span>{c.text}</span></label>)}</div>}
+    </div></article>):<p className="empty">這一天還沒有行程，按右上角＋加入。</p>}</div>
     <div className="day-pager"><button className="btn" disabled={idx<=0} onClick={()=>setTab(active.days[idx-1]?.id)}><ChevronLeft size={18}/>前一天</button><span>{idx+1} / {active.days.length}</span><button className="btn" disabled={idx>=active.days.length-1} onClick={()=>setTab(active.days[idx+1]?.id)}>後一天<ChevronRight size={18}/></button></div>
    </section>}
   </>
@@ -554,9 +613,10 @@ function App(){
    {weatherOpen&&<ModalShell title="天氣中心" onClose={()=>setWeatherOpen(false)}><Weather trip={active}/></ModalShell>}
    {flightOpen&&<ModalShell title="航班中心" onClose={()=>setFlightOpen(false)}><FlightCenter trip={active} onAdd={x=>{addToCurrentDay(x);setFlightOpen(false)}}/></ModalShell>}
    {transitOpen&&<ModalShell title="智慧交通中心" onClose={()=>setTransitOpen(false)}><TransitCenter trip={active} onAdd={x=>{addToCurrentDay(x);setTransitOpen(false)}}/></ModalShell>}
+   {smartMenu&&<SmartItemMenu item={smartMenu.item} index={smartMenu.index} total={smartMenu.total} onClose={()=>setSmartMenu(null)} onEdit={()=>{setItemEditor({dayId:smartMenu.dayId,item:smartMenu.item});setSmartMenu(null)}} onCopy={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'copy');setSmartMenu(null)}} onUp={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'up');setSmartMenu(null)}} onDown={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'down');setSmartMenu(null)}} onDelete={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'delete');setSmartMenu(null)}}/>}
    <BottomNav page={page} onChange={setPage}/>
    {form&&<Form trip={form===true?undefined:form} onSave={saveTrip} onClose={()=>setForm(null)}/>}
-   {itemEditor&&<ItemForm initial={itemEditor.item} onSave={saveItem} onClose={()=>setItemEditor(null)}/>}
+   {itemEditor&&<ItemForm trip={active} initial={itemEditor.item} onSave={saveItem} onClose={()=>setItemEditor(null)}/>}
   </div>
  }
 

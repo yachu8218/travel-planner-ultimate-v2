@@ -1,5 +1,5 @@
 {
-  "name": "旅行手帳 Travel Planner Ultimate 2.4.1",
+  "name": "旅行手帳 Travel Planner Ultimate 2.5.0",
   "short_name": "旅行手帳",
   "start_url": "/",
   "display": "standalone",
@@ -20,5 +20,5 @@
       "purpose": "any maskable"
     }
   ],
-  "description": "日期與時間欄位統一尺寸的表單優化版"
+  "description": "智慧行程卡與地點資料搜尋"
 }

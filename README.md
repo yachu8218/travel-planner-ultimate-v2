@@ -1,3 +1,26 @@
-# Travel Planner Ultimate v2.4.1 — Form Refinement
+# Travel Planner Ultimate v2.5.0 — 智慧行程卡
 
-統一日期與時間欄位高度、圖示及 iPhone Safari 顯示。
+## 智慧選單
+行程卡右上角的「⋯」現在會依類型顯示不同功能。
+
+景點／餐廳／住宿：
+- Google Maps
+- Naver Map
+- 電話與網站
+- 更新地址與營業時間
+- 收藏、照片、消費、票券
+- 編輯、複製、排序與刪除
+
+航班：
+- 航班與航廈資訊
+- 登機證
+- 行李與座位備註
+- 編輯與排序
+
+## 地點搜尋
+在景點、餐廳、甜點或住宿標題輸入名稱後，按「搜尋地點資料」，選擇正確結果即可自動帶入地址。
+
+完整營業時間、電話、網站及評分需要後續串接 Google Places API；本版可先手動填寫，資料會顯示在行程卡中。
+
+## 更新
+解壓縮後覆蓋 GitHub 原檔案並 Commit，Cloudflare Pages 會自動部署。

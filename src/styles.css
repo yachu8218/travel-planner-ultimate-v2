@@ -188,3 +188,21 @@ html,body{width:100%;max-width:100%;overflow-x:hidden!important}
 .flight-search input:not([type="date"]):not([type="time"]),.transit-builder input:not([type="date"]):not([type="time"]),.modal input:not([type="date"]):not([type="time"]),.modal select{min-height:46px!important;height:46px}
 .modal textarea,.transit-builder textarea{height:auto!important;min-height:88px!important}
 @media(max-width:600px){.date-time-field{height:46px}.date-time-field input[type="date"],.date-time-field input[type="time"]{height:42px!important;min-height:42px!important;font-size:16px!important}}
+
+/* v2.5.0 — 智慧行程卡 */
+.place-enrich{margin:12px 0;padding:10px;border:2px dashed var(--primary);border-radius:9px}
+.place-message{font-size:11px;padding:7px;background:var(--soft);border-radius:7px}
+.place-pick-list{display:grid;gap:7px;margin:9px 0}
+.place-pick-list button{display:grid;grid-template-columns:auto 1fr;gap:8px;text-align:left;padding:8px;border:2px solid var(--ink);border-radius:8px;background:white}
+.place-pick-list span{font-size:11px;line-height:1.35}
+.item-address,.item-hours{display:flex;align-items:flex-start;gap:5px;font-size:11px!important;margin:5px 0!important}
+.item-address svg,.item-hours svg{flex:0 0 auto;margin-top:2px}
+.mini-more{padding:5px;border:0;background:transparent;border-radius:50%}
+.mini-more:active{background:var(--soft)}
+.smart-menu{display:grid;gap:8px;padding:12px 0 24px}
+.smart-menu button{display:flex;align-items:center;gap:10px;width:100%;padding:12px;border:2px solid var(--ink);border-radius:9px;background:var(--paper);text-align:left}
+.smart-menu button svg{width:19px;height:19px}
+.smart-menu button:disabled{opacity:.35}
+.smart-menu button.danger{background:#f4d5d5}
+.smart-menu-divider{border-top:2px dashed var(--primary);margin:5px 0}
+.item-actions{display:none!important}
