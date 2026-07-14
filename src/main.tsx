@@ -377,11 +377,14 @@ function FlightCenter({trip,onAdd}:{trip:Trip,onAdd:(x:Item)=>void}){
    localStorage.setItem(FLIGHT_CACHE_KEY,JSON.stringify({...cache,[cacheId]:{results:j.flights,at:Date.now()}}))
   }catch(e:any){
    const cache=JSON.parse(localStorage.getItem(FLIGHT_CACHE_KEY)||'{}')
+   const reason=e?.message||'連線錯誤'
    if(cache[cacheId]?.results?.length){
     setResults(cache[cacheId].results)
-    setMessage(`即時查詢失敗，使用上次快取：${e?.message||'連線錯誤'}`)
+    setMessage(`即時查詢失敗，使用上次快取：${reason}`)
    }else{
-    setMessage(e?.message||'目前無法取得航班資料，可改用手動建立。')
+    setMessage(reason.includes('配額')||reason.includes('quota')||reason.includes('429')
+     ?'RapidAPI 本月配額或請求頻率已達上限，已切換為手動建立航班。'
+     :reason)
     setManual(true)
    }
   }finally{setLoading(false)}
@@ -437,7 +440,7 @@ function FlightCenter({trip,onAdd}:{trip:Trip,onAdd:(x:Item)=>void}){
     <button className="btn primary" onClick={()=>search(false)} disabled={loading}>{loading?<><RefreshCw className="spin" size={18}/>查詢中</>:<><Search size={18}/>查詢航班</>}</button>
     <button className="btn" onClick={()=>search(true)} disabled={loading||!flightNo}><RefreshCw size={17}/>強制更新</button>
    </div>
-   {message&&<div className="service-message">{message}<small>尚未設定 AeroDataBox 金鑰時，可繼續使用下方手動航班。</small></div>}
+   {message&&<div className="service-message">{message}<small>尚未設定 RapidAPI 金鑰或配額不足時，可繼續使用下方手動航班。</small></div>}
    <button className="text-toggle" onClick={()=>setManual(!manual)}>{manual?'收起手動輸入':'＋ 手動建立航班'}</button>
    {manual&&<div className="manual-flight">
     <div className="flight-fields">

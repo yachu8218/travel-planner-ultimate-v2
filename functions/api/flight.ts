@@ -1,5 +1,6 @@
 interface Env {
-  AERODATABOX_API_KEY?: string
+  RAPIDAPI_KEY?: string
+  RAPIDAPI_HOST?: string
 }
 
 const json = (body: unknown, status = 200) =>
@@ -40,10 +41,7 @@ const movement = (m: any) => ({
 const mapFlight = (f: any, index: number) => {
   const departure = movement(f.departure)
   const arrival = movement(f.arrival)
-  const aircraftName = [
-    f.aircraft?.model,
-    f.aircraft?.modeS,
-  ].filter(Boolean).join("・")
+  const aircraftName = [f.aircraft?.model, f.aircraft?.modeS].filter(Boolean).join("・")
   return {
     id: `${f.number || "flight"}-${index}-${departure.iata}-${arrival.iata}`,
     flightNo: f.number || "",
@@ -66,50 +64,66 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   const url = new URL(request.url)
   const flight = (url.searchParams.get("flight") || "").replace(/\s+/g, "").toUpperCase()
   const date = url.searchParams.get("date") || ""
+  const host = (env.RAPIDAPI_HOST || "aerodatabox.p.rapidapi.com").trim()
 
   if (!flight) return json({ message: "請輸入航班號碼。", flights: [] }, 400)
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return json({ message: "請選擇正確的搭乘日期。", flights: [] }, 400)
   }
-  if (!env.AERODATABOX_API_KEY) {
+
+  if (!env.RAPIDAPI_KEY) {
     return json({
       configured: false,
-      message: "Cloudflare 尚未設定 AERODATABOX_API_KEY，可先使用手動航班。",
+      message: "Cloudflare 尚未設定 RAPIDAPI_KEY，可先使用手動航班。",
       flights: []
     }, 503)
   }
 
-  const endpoint = `https://aerodatabox.p.rapidapi.com/flights/number/${encodeURIComponent(flight)}/${encodeURIComponent(date)}`
+  const endpoint = `https://${host}/flights/number/${encodeURIComponent(flight)}/${encodeURIComponent(date)}`
+
   try {
     const response = await fetch(endpoint, {
       headers: {
         "Accept": "application/json",
-        "X-RapidAPI-Key": env.AERODATABOX_API_KEY,
-        "X-RapidAPI-Host": "aerodatabox.p.rapidapi.com"
+        "X-RapidAPI-Key": env.RAPIDAPI_KEY,
+        "X-RapidAPI-Host": host
       }
     })
 
     if (response.status === 204) {
-      return json({ configured: true, provider: "AeroDataBox", message: "這個日期找不到該航班。", flights: [] }, 404)
-    }
-
-    const data: any = await response.json().catch(() => null)
-    if (!response.ok) {
-      const detail = data?.message || data?.detail || data?.error || `AeroDataBox 回傳錯誤 ${response.status}`
       return json({
         configured: true,
         provider: "AeroDataBox",
-        message: response.status === 401 || response.status === 403
-          ? "AeroDataBox 金鑰或方案尚未生效，請確認 RapidAPI 訂閱與 Cloudflare Secret。"
-          : String(detail),
+        message: "這個日期找不到該航班。",
+        flights: []
+      }, 404)
+    }
+
+    const data: any = await response.json().catch(() => null)
+
+    if (!response.ok) {
+      let message = data?.message || data?.detail || data?.error || `RapidAPI 回傳錯誤 ${response.status}`
+
+      if (response.status === 401 || response.status === 403) {
+        message = "RapidAPI 金鑰、Host 或 AeroDataBox 訂閱尚未生效。"
+      } else if (response.status === 429) {
+        message = "RapidAPI 配額或請求頻率已達上限，請稍後再試或改用手動航班。"
+      }
+
+      return json({
+        configured: true,
+        provider: "AeroDataBox",
+        message: String(message),
         flights: []
       }, response.status)
     }
 
     const flights = Array.isArray(data) ? data.map(mapFlight) : []
+
     return json({
       configured: true,
       provider: "AeroDataBox",
+      host,
       flights,
       message: flights.length ? "" : "這個日期找不到該航班。"
     })

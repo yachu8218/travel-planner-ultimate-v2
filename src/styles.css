@@ -659,3 +659,10 @@ form select{
   .flight-choice-route{grid-template-columns:1fr auto 1fr}
   .flight-choice-route b{font-size:21px}
 }
+
+/* v2.8.1 — RapidAPI 修正版 */
+.flight-search .service-message small{
+  display:block;
+  margin-top:6px;
+  line-height:1.45;
+}

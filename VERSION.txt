@@ -1,17 +1,11 @@
 Travel Planner Ultimate
-Version: 2.8.0 — 智慧航班資料庫
+Version: 2.8.1 — RapidAPI 修正版
 
-新增：
-- Cloudflare Function 串接 AeroDataBox RapidAPI
-- 航班號＋日期查詢
-- 同航班號多筆班次選擇
-- 航空公司、起降機場、預定／修正時間
-- Terminal、Gate、行李轉盤
-- 航班狀態、機型、機身編號、飛行時間與距離
-- 查詢結果直接加入目前 Day
-- 航班資料 30 分鐘快取
-- 即時服務失敗時使用最後快取
-- 手動建立航班持續可用
-
-Cloudflare Secret：
-AERODATABOX_API_KEY
+修正：
+- 統一使用 RAPIDAPI_KEY
+- 統一使用 RAPIDAPI_HOST
+- 移除 AERODATABOX_API_KEY
+- 401／403 顯示金鑰、Host 或訂閱未生效
+- 429 顯示配額或頻率上限
+- 配額不足時自動展開手動航班
+- 保留航班快取與離線備援
