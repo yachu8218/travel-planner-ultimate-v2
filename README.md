@@ -1,31 +1,20 @@
-# Travel Planner Ultimate v2.8.1 — RapidAPI 修正版
+# Travel Planner Ultimate v2.8.2 — 航班卡與即時更新強化
 
-## Cloudflare Production Secrets
+## 本次更新
+- 已加入行程的航班改用專用航班卡
+- 顯示航班狀態、航廈、Gate、行李轉盤、機型與更新時間
+- 航班卡及右上角「⋯」都可更新即時資料
+- 更新失敗時保留原本資料
+- 新增護照、線上報到、行李、航廈與登機證檢查清單
+- 首頁航班摘要同步顯示航班狀態
 
-本版只使用：
+## Cloudflare Secrets
+沿用：
 
 ```text
 RAPIDAPI_KEY
 RAPIDAPI_HOST
 ```
-
-`RAPIDAPI_HOST` 的值：
-
-```text
-aerodatabox.p.rapidapi.com
-```
-
-不再使用：
-
-```text
-AERODATABOX_API_KEY
-```
-
-## 修正內容
-- RapidAPI Secret 名稱與目前 Cloudflare 設定一致
-- 金鑰、Host、訂閱或配額錯誤會顯示明確原因
-- 配額不足時自動切換為手動建立航班
-- 航班快取功能保留
 
 ## 更新方式
 解壓縮後覆蓋 GitHub 原檔案並 Commit，Cloudflare Pages 會自動部署。

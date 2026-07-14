@@ -20,7 +20,9 @@ type Item={
  lat?:number,lon?:number,rating?:number,userRatingCount?:number,openNow?:boolean,placeSource?:string,
  photoName?:string,primaryType?:string,
  flightDate?:string,flightStatus?:string,airline?:string,aircraftRegistration?:string,
- departureScheduled?:string,arrivalScheduled?:string,flightUpdatedAt?:number
+ departureScheduled?:string,arrivalScheduled?:string,flightUpdatedAt?:number,
+ departureTerminal?:string,arrivalTerminal?:string,departureGate?:string,arrivalGate?:string,
+ baggageBelt?:string,aircraftModel?:string,flightSource?:string
 }
 type Day={id:string,date:string,title:string,items:Item[]}
 type Traveler={id:string;name:string}
@@ -400,11 +402,15 @@ function FlightCenter({trip,onAdd}:{trip:Trip,onAdd:(x:Item)=>void}){
    start:depTime?timeOnly(depTime):'00:00',end:arrTime?timeOnly(arrTime):'00:00',
    title:`${result.airline||''} ${result.flightNo}`.trim(),
    flightNo:result.flightNo,flightDate:date,flightStatus:result.status,airline:result.airline,
-   aircraftRegistration:result.registration,departureScheduled:depTime,arrivalScheduled:arrTime,
-   flightUpdatedAt:Date.now(),transportMode:'flight',
-   from:[dep.airport,dep.iata,dep.terminal&&`T${dep.terminal}`].filter(Boolean).join(' '),
-   to:[arr.airport,arr.iata,arr.terminal&&`T${arr.terminal}`].filter(Boolean).join(' '),
+   aircraftRegistration:result.registration,aircraftModel:result.aircraft,
+   departureScheduled:depTime,arrivalScheduled:arrTime,flightUpdatedAt:Date.now(),
+   departureTerminal:dep.terminal,arrivalTerminal:arr.terminal,departureGate:dep.gate,
+   arrivalGate:arr.gate,baggageBelt:arr.baggage,flightSource:result.source||'AeroDataBox',
+   transportMode:'flight',
+   from:[dep.airport,dep.iata].filter(Boolean).join(' '),
+   to:[arr.airport,arr.iata].filter(Boolean).join(' '),
    durationMin:result.durationMin,distanceKm:result.distanceKm,
+   checks:flightChecklistDefaults.map(text=>({id:id(),text,done:false})),
    note:[
     `狀態：${flightStatusLabel(result.status)}`,
     result.aircraft&&`機型：${result.aircraft}`,
@@ -422,8 +428,10 @@ function FlightCenter({trip,onAdd}:{trip:Trip,onAdd:(x:Item)=>void}){
   onAdd({
    id:id(),type:'flight',start:m.start,end:m.end,title:`${m.airline||''} ${no}`.trim(),
    flightNo:no,flightDate:date,airline:m.airline,transportMode:'flight',
-   from:[m.from,m.terminalFrom&&`T${m.terminalFrom}`,m.gate&&`Gate ${m.gate}`].filter(Boolean).join(' '),
-   to:[m.to,m.terminalTo&&`T${m.terminalTo}`,m.baggage&&`行李 ${m.baggage}`].filter(Boolean).join(' '),
+   departureTerminal:m.terminalFrom,arrivalTerminal:m.terminalTo,departureGate:m.gate,
+   baggageBelt:m.baggage,flightSource:'手動建立',
+   from:m.from,to:m.to,
+   checks:flightChecklistDefaults.map(text=>({id:id(),text,done:false})),
    note:'手動建立的航班資料，請於出發前向航空公司確認。'
   })
  }
@@ -872,7 +880,7 @@ function PlaceCardDetails({item}:{item:Item}){
  </div>
 }
 
-function SmartItemMenu({item,index,total,isFavorite,onClose,onEdit,onCopy,onUp,onDown,onDelete,onFavorite}:{item:Item,index:number,total:number,isFavorite:boolean,onClose:()=>void,onEdit:()=>void,onCopy:()=>void,onUp:()=>void,onDown:()=>void,onDelete:()=>void,onFavorite:()=>void}){
+function SmartItemMenu({item,index,total,isFavorite,onClose,onEdit,onCopy,onUp,onDown,onDelete,onFavorite,onRefreshFlight}:{item:Item,index:number,total:number,isFavorite:boolean,onClose:()=>void,onEdit:()=>void,onCopy:()=>void,onUp:()=>void,onDown:()=>void,onDelete:()=>void,onFavorite:()=>void,onRefreshFlight:()=>void}){
  const isPlace=item.type==='place'||item.type==='meal'||item.type==='hotel'
  const isFlight=item.type==='flight'
  const query=item.address||item.title
@@ -883,7 +891,7 @@ function SmartItemMenu({item,index,total,isFavorite,onClose,onEdit,onCopy,onUp,o
  return <ModalShell title={item.title} onClose={onClose}>
   <div className="smart-menu">
    {isPlace&&<><button onClick={openGoogle}><Navigation/>Google Maps 導航</button><button onClick={openNaver}><Compass/>Naver Map 搜尋</button>{item.phone&&<button onClick={call}><Phone/>撥打店家電話</button>}{item.website&&<button onClick={openWebsite}><Globe2/>開啟官方網站</button>}<button onClick={onEdit}><RefreshCw/>更新地址與營業時間</button><button onClick={onFavorite}>{isFavorite?<HeartOff/>:<Heart/>}{isFavorite?'取消收藏':'加入我的收藏'}</button><button><ImagePlus/>加入照片</button><button><ReceiptText/>記錄消費</button><button><Ticket/>加入票券</button></>}
-   {isFlight&&<><button onClick={onEdit}><Plane/>航班與航廈資訊</button><button><Ticket/>加入登機證</button><button><NotebookPen/>行李與座位備註</button></>}
+   {isFlight&&<><button onClick={onRefreshFlight}><RefreshCw/>更新即時航班資料</button><button onClick={onEdit}><Plane/>航班與航廈資訊</button><button onClick={onEdit}><Ticket/>登機證與座位資料</button><button onClick={onEdit}><NotebookPen/>行李與備註</button></>}
    {!isPlace&&!isFlight&&<button onClick={onEdit}><NotebookPen/>查看與編輯詳細資料</button>}
    <div className="smart-menu-divider"/>
    <button onClick={onEdit}><Pencil/>編輯</button>
@@ -893,6 +901,58 @@ function SmartItemMenu({item,index,total,isFavorite,onClose,onEdit,onCopy,onUp,o
    <button className="danger" onClick={onDelete}><Trash2/>刪除</button>
   </div>
  </ModalShell>
+}
+
+
+const flightStatusClass=(status='')=>{
+ const s=status.toLowerCase()
+ if(/cancel|divert/.test(s))return 'danger'
+ if(/delay/.test(s))return 'warning'
+ if(/arrived|departed|enroute/.test(s))return 'success'
+ if(/boarding|checkin|gateclosed/.test(s))return 'boarding'
+ return 'neutral'
+}
+const flightChecklistDefaults=[
+ '確認護照與簽證',
+ '完成線上報到',
+ '確認行李限重',
+ '確認航廈與登機門',
+ '下載或截圖登機證'
+]
+function FlightCardDetails({item,onRefresh,refreshing}:{item:Item;onRefresh?:()=>void;refreshing?:boolean}){
+ const status=flightStatusLabel(item.flightStatus)
+ const updated=item.flightUpdatedAt?new Date(item.flightUpdatedAt).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}):''
+ const depCode=item.from?.match(/\b[A-Z]{3}\b/)?.[0]||item.from?.split(' ').at(-1)||'—'
+ const arrCode=item.to?.match(/\b[A-Z]{3}\b/)?.[0]||item.to?.split(' ').at(-1)||'—'
+ return <div className="saved-flight-card">
+  <div className="saved-flight-top">
+   <div><span>{item.airline||'航班'}</span><h3>{item.flightNo||item.title}</h3></div>
+   <span className={`saved-flight-status ${flightStatusClass(item.flightStatus)}`}>{status}</span>
+  </div>
+  <div className="saved-flight-route">
+   <div>
+    <b>{depCode}</b>
+    <strong>{item.start}</strong>
+    <small>{item.departureTerminal&&`航廈 ${item.departureTerminal}`}{item.departureGate&&`・Gate ${item.departureGate}`}</small>
+   </div>
+   <div className="saved-flight-path"><Plane size={20}/><span>{item.durationMin?`${Math.floor(item.durationMin/60)}小時${item.durationMin%60}分`:''}</span></div>
+   <div>
+    <b>{arrCode}</b>
+    <strong>{item.end}</strong>
+    <small>{item.arrivalTerminal&&`航廈 ${item.arrivalTerminal}`}{item.baggageBelt&&`・行李 ${item.baggageBelt}`}</small>
+   </div>
+  </div>
+  <div className="saved-flight-info">
+   {item.departureGate&&<span><b>登機門</b>{item.departureGate}</span>}
+   {item.baggageBelt&&<span><b>行李轉盤</b>{item.baggageBelt}</span>}
+   {item.aircraftModel&&<span><b>機型</b>{item.aircraftModel}</span>}
+   {item.aircraftRegistration&&<span><b>機身</b>{item.aircraftRegistration}</span>}
+  </div>
+  <div className="saved-flight-footer">
+   <small>{updated?`更新於 ${updated}`:item.flightSource||'手動資料'}</small>
+   {onRefresh&&item.flightNo&&item.flightDate&&<button onClick={onRefresh} disabled={refreshing}>{refreshing?<RefreshCw className="spin" size={15}/>:<RefreshCw size={15}/>}更新航班</button>}
+  </div>
+ </div>
 }
 
 function TransportDetails({item}:{item:Item}){
@@ -924,6 +984,7 @@ function App(){
  const [transitOpen,setTransitOpen]=useState(false)
  const [smartMenu,setSmartMenu]=useState<{dayId:string,item:Item,index:number,total:number}|null>(null)
  const [weatherOpen,setWeatherOpen]=useState(false)
+ const [refreshingFlight,setRefreshingFlight]=useState<string|null>(null)
  const active=s.trips.find(t=>t.id===s.active)||null
  const update=(n:State)=>{setS(n);if(!readOnly)save(n)}
  const updateWallet=(w:WalletData)=>{if(!active)return;const t={...active,wallet:w,updated:Date.now()};update({...s,trips:s.trips.map(x=>x.id===t.id?t:x)})}
@@ -966,6 +1027,44 @@ function App(){
   const t={...active,days:active.days.map(d=>d.id!==itemEditor.dayId?d:{...d,items:itemEditor.item?d.items.map(i=>i.id===x.id?x:i):[...d.items,x]}),updated:Date.now()}
   update({...s,trips:s.trips.map(z=>z.id===t.id?t:z)});setItemEditor(null)
  }
+ const refreshSavedFlight=async(dayId:string,item:Item)=>{
+  if(!active||!item.flightNo||!item.flightDate){
+   alert('這筆航班缺少航班號或日期，請先編輯補齊。')
+   return
+  }
+  setRefreshingFlight(item.id)
+  try{
+   const r=await fetch(`/api/flight?flight=${encodeURIComponent(item.flightNo)}&date=${encodeURIComponent(item.flightDate)}`)
+   const j=await r.json()
+   if(!r.ok||!Array.isArray(j.flights)||!j.flights.length)throw new Error(j.message||'找不到航班資料')
+   const matches=j.flights as FlightResult[]
+   const oldFrom=item.from||'',oldTo=item.to||''
+   const best=matches.find(f=>(f.departure.iata&&oldFrom.includes(f.departure.iata))&&(f.arrival.iata&&oldTo.includes(f.arrival.iata)))||matches[0]
+   const dep=best.departure,arr=best.arrival
+   const depTime=bestFlightTime(dep),arrTime=bestFlightTime(arr)
+   const updated:Item={
+    ...item,
+    title:`${best.airline||item.airline||''} ${best.flightNo||item.flightNo}`.trim(),
+    airline:best.airline||item.airline,flightStatus:best.status,
+    start:depTime?timeOnly(depTime):item.start,end:arrTime?timeOnly(arrTime):item.end,
+    departureScheduled:depTime||item.departureScheduled,arrivalScheduled:arrTime||item.arrivalScheduled,
+    departureTerminal:dep.terminal,arrivalTerminal:arr.terminal,departureGate:dep.gate,
+    arrivalGate:arr.gate,baggageBelt:arr.baggage,aircraftModel:best.aircraft,
+    aircraftRegistration:best.registration,durationMin:best.durationMin,distanceKm:best.distanceKm,
+    from:[dep.airport,dep.iata].filter(Boolean).join(' ')||item.from,
+    to:[arr.airport,arr.iata].filter(Boolean).join(' ')||item.to,
+    flightUpdatedAt:Date.now(),flightSource:best.source||'AeroDataBox'
+   }
+   const t={...active,days:active.days.map(d=>d.id===dayId?{...d,items:d.items.map(i=>i.id===item.id?updated:i)}:d),updated:Date.now()}
+   update({...s,trips:s.trips.map(z=>z.id===t.id?t:z)})
+   alert(`航班已更新：${flightStatusLabel(best.status)}`)
+  }catch(e:any){
+   alert(`更新失敗：${e?.message||'目前無法取得航班資料'}\n原本資料已保留。`)
+  }finally{
+   setRefreshingFlight(null)
+  }
+ }
+
  const itemAction=(dayId:string,itemId:string,action:'delete'|'copy'|'up'|'down')=>{
   if(!active)return
   const t={...active,days:active.days.map(d=>{
@@ -1007,7 +1106,8 @@ function App(){
    <nav className="day-tabs" aria-label="每日行程分頁">{active.days.map((d,i)=><button key={d.id} className={current?.id===d.id?'active':''} onClick={()=>setTab(d.id)}><small>{d.date.slice(5)}</small><b>Day {i+1}</b></button>)}</nav>
    {current&&<section className="card day single-day"><div className="day-head"><div><small>{new Date(current.date+'T12:00:00').toLocaleDateString('zh-TW',{weekday:'long'})}</small><h2>{current.title}・{current.date.slice(5)}</h2></div>{!readOnly&&<button className="icon" onClick={()=>setItemEditor({dayId:current.id})}><Plus/></button>}</div>
     <div className="day-summary"><span>📌 {current.items.length} 個安排</span><span>🚉 {transportCount} 段交通</span><span>⏱ {totalDuration} 分鐘通勤</span></div>
-    <div className="timeline">{current.items.length?current.items.map((i,itemIndex)=><article className={`item ${i.type}`} key={i.id}><div className="time">{i.start}<span>～</span>{i.end}</div><div className="body"><div className="item-head"><div><small>{typeName[i.type].toUpperCase()}</small><h3>{i.title}</h3></div>{!readOnly&&<button className="mini-more" aria-label="更多功能" onClick={()=>setSmartMenu({dayId:current.id,item:i,index:itemIndex,total:current.items.length})}><MoreHorizontal size={18}/></button>}</div>{(i.type==='transport'||i.type==='flight')&&<TransportDetails item={i}/>} {(i.type==='place'||i.type==='meal'||i.type==='hotel')?<PlaceCardDetails item={i}/>:<>{i.address&&<p className="item-address"><MapPin size={14}/>{i.address}</p>}{i.openingHours&&<p className="item-hours"><Clock3 size={14}/>{i.openingHours}</p>}{i.rating!=null&&<p className="item-rating"><Star size={14}/> {i.rating}（{i.userRatingCount||0}）{i.openNow===true?'・營業中':i.openNow===false?'・目前休息':''}</p>}</>}{i.note&&i.type!=='note'&&i.note.trim()!==i.address?.trim()&&<p>{i.note}</p>}{i.checks&&<div className="checks"><div className="note-heading"><StickyNote size={17}/>便條待辦</div>{i.checks.map(c=><label key={c.id}><input disabled={readOnly} type="checkbox" checked={c.done} onChange={()=>toggle(current.id,i.id,c.id)}/><span>{c.text}</span></label>)}</div>}
+    <div className="timeline">{current.items.length?current.items.map((i,itemIndex)=><article className={`item ${i.type}`} key={i.id}><div className="time">{i.start}<span>～</span>{i.end}</div><div className="body"><div className="item-head"><div><small>{typeName[i.type].toUpperCase()}</small><h3>{i.title}</h3></div>{!readOnly&&<button className="mini-more" aria-label="更多功能" onClick={()=>setSmartMenu({dayId:current.id,item:i,index:itemIndex,total:current.items.length})}><MoreHorizontal size={18}/></button>}</div>{i.type==='transport'&&<TransportDetails item={i}/>}
+{i.type==='flight'&&<FlightCardDetails item={i} onRefresh={()=>refreshSavedFlight(current.id,i)} refreshing={refreshingFlight===i.id}/>} {(i.type==='place'||i.type==='meal'||i.type==='hotel')?<PlaceCardDetails item={i}/>:<>{i.address&&<p className="item-address"><MapPin size={14}/>{i.address}</p>}{i.openingHours&&<p className="item-hours"><Clock3 size={14}/>{i.openingHours}</p>}{i.rating!=null&&<p className="item-rating"><Star size={14}/> {i.rating}（{i.userRatingCount||0}）{i.openNow===true?'・營業中':i.openNow===false?'・目前休息':''}</p>}</>}{i.note&&i.type!=='note'&&i.note.trim()!==i.address?.trim()&&<p>{i.note}</p>}{i.checks&&<div className="checks"><div className="note-heading"><StickyNote size={17}/>便條待辦</div>{i.checks.map(c=><label key={c.id}><input disabled={readOnly} type="checkbox" checked={c.done} onChange={()=>toggle(current.id,i.id,c.id)}/><span>{c.text}</span></label>)}</div>}
     </div></article>):<p className="empty">這一天還沒有行程，按右上角＋加入。</p>}</div>
     <div className="day-pager"><button className="btn" disabled={idx<=0} onClick={()=>setTab(active.days[idx-1]?.id)}><ChevronLeft size={18}/>前一天</button><span>{idx+1} / {active.days.length}</span><button className="btn" disabled={idx>=active.days.length-1} onClick={()=>setTab(active.days[idx+1]?.id)}>後一天<ChevronRight size={18}/></button></div>
    </section>}
@@ -1021,7 +1121,7 @@ function App(){
      <section className="control-grid">
       <article className="card control-card hero-control"><small>NEXT TRIP</small><h3>{daysUntil>0?`距離出發還有 ${daysUntil} 天`:daysUntil===0?'今天出發':'旅程進行中／已完成'}</h3><div className="progress"><i style={{width:`${Math.min(100,Math.max(4,completion))}%`}}/></div><span>旅行進度 {completion}%・共 {active.days.length} Days</span></article>
       <article className="card control-card today-card"><CalendarDays size={25}/><small>TODAY PLAN</small><h3>{todayDay?`Day ${todayIndex+1}・${todayDay.date.slice(5)}`:'尚未建立日期'}</h3><span>{todayDay?.items.length||0} 個安排</span><button className="inline-link" onClick={()=>{setTab(todayDay?.id||active.days[0]?.id);setPage('itinerary')}}>查看今日行程 →</button></article>
-      <article className="card control-card"><Plane size={25}/><small>航班資訊</small><h3>{nextFlight?.flightNo||'尚未加入航班'}</h3><span>{nextFlight?`${nextFlight.start} → ${nextFlight.end}`:'可先手動建立航班卡'}</span><button className="inline-link" onClick={()=>setFlightOpen(true)}>開啟航班中心 →</button></article>
+      <article className="card control-card"><Plane size={25}/><small>航班資訊</small><h3>{nextFlight?.flightNo||'尚未加入航班'}</h3><span>{nextFlight?`${nextFlight.start} → ${nextFlight.end}・${flightStatusLabel(nextFlight.flightStatus)}`:'可查詢或手動建立航班卡'}</span><button className="inline-link" onClick={()=>setFlightOpen(true)}>開啟航班中心 →</button></article>
       <article className="card control-card"><WalletCards size={25}/><small>旅行錢包</small><h3>{active.currency}</h3><span>即時匯率、預算與旅伴分帳</span><button className="inline-link" onClick={()=>setPage('wallet')}>開啟旅行錢包 →</button></article>
      </section>
      <Weather trip={active}/>
@@ -1037,7 +1137,7 @@ function App(){
    {weatherOpen&&<ModalShell title="天氣中心" onClose={()=>setWeatherOpen(false)}><Weather trip={active}/></ModalShell>}
    {flightOpen&&<ModalShell title="航班中心" onClose={()=>setFlightOpen(false)}><FlightCenter trip={active} onAdd={x=>{addToCurrentDay(x);setFlightOpen(false)}}/></ModalShell>}
    {transitOpen&&<ModalShell title="智慧交通中心" onClose={()=>setTransitOpen(false)}><TransitCenter trip={active} onAdd={x=>{addToCurrentDay(x);setTransitOpen(false)}}/></ModalShell>}
-   {smartMenu&&<SmartItemMenu item={smartMenu.item} index={smartMenu.index} total={smartMenu.total} isFavorite={(active.favorites||[]).some(f=>(smartMenu.item.placeSource&&f.placeSource===smartMenu.item.placeSource)||(f.title===smartMenu.item.title&&f.address===smartMenu.item.address))} onClose={()=>setSmartMenu(null)} onEdit={()=>{setItemEditor({dayId:smartMenu.dayId,item:smartMenu.item});setSmartMenu(null)}} onCopy={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'copy');setSmartMenu(null)}} onUp={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'up');setSmartMenu(null)}} onDown={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'down');setSmartMenu(null)}} onDelete={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'delete');setSmartMenu(null)}} onFavorite={()=>{toggleFavorite(smartMenu.item);setSmartMenu(null)}}/>}
+   {smartMenu&&<SmartItemMenu item={smartMenu.item} index={smartMenu.index} total={smartMenu.total} isFavorite={(active.favorites||[]).some(f=>(smartMenu.item.placeSource&&f.placeSource===smartMenu.item.placeSource)||(f.title===smartMenu.item.title&&f.address===smartMenu.item.address))} onClose={()=>setSmartMenu(null)} onEdit={()=>{setItemEditor({dayId:smartMenu.dayId,item:smartMenu.item});setSmartMenu(null)}} onCopy={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'copy');setSmartMenu(null)}} onUp={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'up');setSmartMenu(null)}} onDown={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'down');setSmartMenu(null)}} onDelete={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'delete');setSmartMenu(null)}} onFavorite={()=>{toggleFavorite(smartMenu.item);setSmartMenu(null)}} onRefreshFlight={()=>{const x=smartMenu;setSmartMenu(null);refreshSavedFlight(x.dayId,x.item)}}/>}
    <BottomNav page={page} onChange={setPage}/>
    {form&&<Form trip={form===true?undefined:form} onSave={saveTrip} onClose={()=>setForm(null)}/>}
    {itemEditor&&<ItemForm trip={active} initial={itemEditor.item} onSave={saveItem} onClose={()=>setItemEditor(null)}/>}
