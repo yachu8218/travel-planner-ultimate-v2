@@ -28,5 +28,5 @@ AERODATABOX_API_KEY
 解壓縮後覆蓋 GitHub 原檔案並 Commit，Cloudflare Pages 會自動部署。請保留：
 
 ```text
-functions/api/flight.ts
+functions/api/flight.ts 
 ```
