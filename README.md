@@ -13,3 +13,4 @@
 
 ## 更新
 解壓縮後覆蓋 GitHub 原檔案並 Commit，Cloudflare Pages 會自動部署。
+Secret deployment refresh
