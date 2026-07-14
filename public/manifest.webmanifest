@@ -1,5 +1,5 @@
 {
-  "name": "旅行手帳 Travel Planner Ultimate 2.6.3",
+  "name": "旅行手帳 Travel Planner Ultimate 2.7.0",
   "short_name": "旅行手帳",
   "start_url": "/",
   "display": "standalone",
@@ -20,5 +20,5 @@
       "purpose": "any maskable"
     }
   ],
-  "description": "精簡智慧地點卡片，無照片不留空白"
+  "description": "景點收藏中心與 Google Places 探索整合"
 }

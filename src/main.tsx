@@ -4,7 +4,7 @@ import {
  Plus,Pencil,Copy,Trash2,ArrowLeft,Share2,FileDown,Upload,Palette,Clock3,Ruler,
  StickyNote,ChevronLeft,ChevronRight,House,CalendarDays,Compass,WalletCards,
  Languages,UserRound,RefreshCw,Plane,MapPin,CloudSun,CheckCircle2,MoreHorizontal,
- ArrowUp,ArrowDown,X,Search,Navigation,Phone,Globe2,ImagePlus,Ticket,ReceiptText,Star,NotebookPen
+ ArrowUp,ArrowDown,X,Search,Navigation,Phone,Globe2,ImagePlus,Ticket,ReceiptText,Star,NotebookPen,Heart,HeartOff
 } from 'lucide-react'
 import './styles.css'
 
@@ -26,7 +26,7 @@ type Expense={id:string;title:string;amount:number;currency:string;payerId:strin
 type WalletData={travelers:Traveler[];expenses:Expense[];budgetTwd:number;overseasFee:number}
 type Trip={
  id:string,name:string,destination:string,country:string,currency:string,language:string,locale:string,
- start:string,end:string,lat:number,lon:number,cover?:string,days:Day[],theme:ThemeId,wallet?:WalletData,created:number,updated:number
+ start:string,end:string,lat:number,lon:number,cover?:string,days:Day[],theme:ThemeId,wallet?:WalletData,favorites?:Item[],created:number,updated:number
 }
 type State={version:2,active:string|null,trips:Trip[]}
 type WeatherDay={date:string,code:number,max:number,min:number,rain:number}
@@ -325,11 +325,108 @@ function FlightCenter({trip,onAdd}:{trip:Trip,onAdd:(x:Item)=>void}){
  const addManual=()=>{const no=flightNo.trim().toUpperCase()||'自訂航班';onAdd({id:id(),type:'flight',start:m.start,end:m.end,title:`${no} ${m.airline||'航班'}`,flightNo:no,transportMode:'flight',from:[m.from,m.terminalFrom&&`T${m.terminalFrom}`].filter(Boolean).join(' '),to:[m.to,m.terminalTo&&`T${m.terminalTo}`].filter(Boolean).join(' '),note:'手動建立的航班資料，請於出發前向航空公司確認。'})}
  return <section className="flight-center"><div className="flight-search card"><div className="feature-head"><div><small>FLIGHT SEARCH</small><h2>航班中心</h2></div><Plane size={30}/></div><p>可先手動建立航班；日後設定 API Key 後即可查詢即時資料。</p><div className="flight-fields"><label>航班號<input value={flightNo} onChange={e=>setFlightNo(e.target.value.toUpperCase())} placeholder="例如：KE2086"/></label><label>搭乘日期<div className="date-time-field"><CalendarDays size={18}/><input type="date" value={date} onChange={e=>setDate(e.target.value)}/></div></label></div><button className="btn primary full" onClick={search} disabled={loading}>{loading?<><RefreshCw className="spin" size={18}/>正在查詢</>:<><Search size={18}/>查詢即時航班</>}</button>{message&&<div className="service-message">{message}<small>現在不用設定金鑰，也能使用下方的手動航班表單。</small></div>}<button className="text-toggle" onClick={()=>setManual(!manual)}>{manual?'收起手動輸入':'＋ 手動建立航班'}</button>{manual&&<div className="manual-flight"><div className="flight-fields"><label>航空公司<input value={m.airline} onChange={e=>setM({...m,airline:e.target.value})} placeholder="例如：大韓航空"/></label><label>出發機場<input value={m.from} onChange={e=>setM({...m,from:e.target.value})} placeholder="桃園 TPE"/></label><label>抵達機場<input value={m.to} onChange={e=>setM({...m,to:e.target.value})} placeholder="釜山 PUS"/></label><label>出發航廈<input value={m.terminalFrom} onChange={e=>setM({...m,terminalFrom:e.target.value})} placeholder="例如：2"/></label><label>抵達航廈<input value={m.terminalTo} onChange={e=>setM({...m,terminalTo:e.target.value})}/></label><label>起飛時間<input type="time" value={m.start} onChange={e=>setM({...m,start:e.target.value})}/></label><label>抵達時間<input type="time" value={m.end} onChange={e=>setM({...m,end:e.target.value})}/></label></div><button className="btn yellow full" onClick={addManual}><Plus size={18}/>加入目前 Day</button></div>}</div>{result&&<article className="card flight-result"><div className="flight-result-head"><div><small>{result.airline||'AIRLINE'}</small><h2>{result.flightNo}</h2></div><span className="status-pill">{result.status||'已取得資料'}</span></div><div className="flight-route"><div><b>{result.departure.iata||'—'}</b><span>{result.departure.airport||'出發機場'}</span><strong>{ftime(result.departure.scheduled)}</strong><small>{result.departure.terminal?`Terminal ${result.departure.terminal}`:''}</small></div><Plane size={30}/><div><b>{result.arrival.iata||'—'}</b><span>{result.arrival.airport||'抵達機場'}</span><strong>{ftime(result.arrival.scheduled)}</strong><small>{result.arrival.terminal?`Terminal ${result.arrival.terminal}`:''}</small></div></div><button className="btn primary full" onClick={addResult}><Plus size={18}/>加入目前 Day</button></article>}</section>
 }
-function ExploreCenter({trip,onAdd}:{trip:Trip,onAdd:(x:Item)=>void}){
- const [q,setQ]=useState(''),[loading,setLoading]=useState(false),[places,setPlaces]=useState<PlaceResult[]>([]),[msg,setMsg]=useState(''),[sq,setSq]=useState('')
+function ExploreCenter({trip,onAdd,onFavorite,onRemoveFavorite}:{trip:Trip,onAdd:(x:Item)=>void,onFavorite:(x:Item)=>void,onRemoveFavorite:(id:string)=>void}){
+ const [q,setQ]=useState('')
+ const [loading,setLoading]=useState(false)
+ const [places,setPlaces]=useState<PlaceResult[]>([])
+ const [msg,setMsg]=useState('')
+ const [sq,setSq]=useState('')
+ const [view,setView]=useState<'search'|'favorites'>('search')
  const ss=useMemo(()=>stationSearch(sq),[sq])
- const search=async()=>{if(!q.trim()){setMsg('請輸入地點、店名或地址。');return}setLoading(true);setMsg('');try{const full=`${q} ${trip.destination}`;const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&accept-language=zh-TW,zh,en,ko,ja&q=${encodeURIComponent(full)}`);if(!r.ok)throw new Error();const j=await r.json();setPlaces(j);if(!j.length)setMsg('免費地圖資料沒有找到結果，可改用 Google Maps 或 Naver Map。')}catch{setMsg('地點搜尋暫時無法使用，請改用外部地圖。')}finally{setLoading(false)}}
- return <section className="explore-center"><div className="card feature-card"><div className="feature-head"><div><small>PLACE SEARCH</small><h2>地點探索</h2></div><MapPin size={30}/></div><div className="search-row"><input value={q} onChange={e=>setQ(e.target.value)} placeholder="搜尋景點、餐廳、住宿或地址"/><button className="icon" onClick={search}>{loading?<RefreshCw className="spin" size={18}/>:<Search size={18}/>}</button></div><div className="external"><a className="btn" target="_blank" rel="noreferrer" href={gmap(`${q} ${trip.destination}`)}>Google Maps</a><a className="btn" target="_blank" rel="noreferrer" href={nmap(`${q} ${trip.destination}`)}>Naver Map</a></div>{msg&&<p className="service-message">{msg}</p>}</div><div className="place-list">{places.map(p=><article className="card place-result" key={p.place_id}><div><h3>{p.display_name.split(',')[0]}</h3><p>{p.display_name}</p></div><div><a target="_blank" rel="noreferrer" href={gmap(p.display_name)}>地圖</a><button onClick={()=>onAdd({id:id(),type:'place',start:'09:00',end:'10:00',title:q||p.display_name.split(',')[0],note:p.display_name})}>加入 Day</button></div></article>)}</div><div className="card feature-card"><div className="feature-head"><div><small>TRANSIT STATION</small><h2>地鐵站搜尋</h2></div><span className="bigemoji">🚇</span></div><input value={sq} onChange={e=>setSq(e.target.value)} placeholder="例如：海雲台、西面、梅田、難波"/><div className="station-list">{ss.map(s=><button key={s.join('-')} onClick={()=>onAdd({id:id(),type:'transport',start:'09:00',end:'09:30',title:`前往${s[2]}站`,transportMode:'metro',to:`${s[2]} ${s[3]} ${s[4]}`,line:`${s[0]} ${s[1]}`})}><span><b>{s[2]}</b><small>{s[3]}・{s[4]}</small></span><em>{s[0]}・{s[1]}</em><Plus size={17}/></button>)}</div></div></section>
+ const favorites=trip.favorites||[]
+ const isFavorite=(placeId:string)=>favorites.some(f=>f.placeSource===placeId||f.id===placeId)
+ const resultToItem=(p:PlaceResult):Item=>({
+  id:id(),type:/restaurant|cafe|bakery|food/.test(p.primaryType||'')?'meal':'place',
+  start:'09:00',end:'10:00',title:p.name||q||p.display_name.split(',')[0],
+  address:p.display_name,lat:Number(p.lat),lon:Number(p.lon),
+  openingHours:p.openingHours,phone:p.phone,website:p.website,rating:p.rating,
+  userRatingCount:p.userRatingCount,openNow:p.openNow,photoName:p.photoName,
+  primaryType:p.primaryType,placeSource:p.place_id
+ })
+ const search=async()=>{
+  if(!q.trim()){setMsg('請輸入地點、店名或地址。');return}
+  setLoading(true);setMsg('正在搜尋 Google Places…');setPlaces([])
+  const aliases:Record<string,string>={'釜山':'부산','首爾':'서울','濟州':'제주','大邱':'대구','仁川':'인천'}
+  const queries=Array.from(new Set([
+   `${q} ${aliases[trip.destination]||trip.destination}`.trim(),
+   `${q} ${trip.destination}`.trim(),
+   q.trim()
+  ]))
+  try{
+   for(const full of queries){
+    const r=await fetch(`/api/places?q=${encodeURIComponent(full)}&language=${encodeURIComponent(trip.locale)}&destination=${encodeURIComponent(trip.destination)}`)
+    const j=await r.json()
+    if(r.ok&&Array.isArray(j.results)&&j.results.length){
+     setPlaces(j.results)
+     setMsg(`找到 ${j.results.length} 筆結果，請確認店名與分店。`)
+     setLoading(false)
+     return
+    }
+    if(j.configured===false)setMsg('Google Places 金鑰尚未生效，請確認 Cloudflare Production Secret。')
+    else if(j.message)setMsg(j.message)
+   }
+   setMsg('找不到符合結果，建議輸入完整店名、分店名或當地語言名稱。')
+  }catch{
+   setMsg('地點搜尋暫時無法使用，仍可使用外部地圖搜尋。')
+  }finally{setLoading(false)}
+ }
+ return <section className="explore-center">
+  <div className="explore-tabs">
+   <button className={view==='search'?'active':''} onClick={()=>setView('search')}><Search size={17}/>搜尋地點</button>
+   <button className={view==='favorites'?'active':''} onClick={()=>setView('favorites')}><Heart size={17}/>我的收藏 <span>{favorites.length}</span></button>
+  </div>
+
+  {view==='search'&&<>
+   <div className="card feature-card">
+    <div className="feature-head"><div><small>PLACE SEARCH</small><h2>地點探索</h2></div><MapPin size={30}/></div>
+    <div className="search-row"><input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="搜尋景點、餐廳、住宿或地址"/><button className="icon" onClick={search}>{loading?<RefreshCw className="spin" size={18}/>:<Search size={18}/>}</button></div>
+    <div className="external"><a className="btn" target="_blank" rel="noreferrer" href={gmap(`${q} ${trip.destination}`)}>Google Maps</a><a className="btn" target="_blank" rel="noreferrer" href={nmap(`${q} ${trip.destination}`)}>Naver Map</a></div>
+    {msg&&<p className="service-message">{msg}</p>}
+   </div>
+   <div className="place-list rich-place-results">{places.map(p=>{
+    const item=resultToItem(p)
+    const favorite=isFavorite(p.place_id)
+    return <article className="card place-result-rich" key={p.place_id}>
+     {p.photoName&&<img src={`/api/place-photo?name=${encodeURIComponent(p.photoName)}&maxWidth=700`} alt={p.name||''} loading="lazy" onError={e=>e.currentTarget.style.display='none'}/>}
+     <div className="place-result-content">
+      <small>{/restaurant|food/.test(p.primaryType||'')?'餐廳／甜點':'景點／地點'}</small>
+      <h3>{p.name||p.display_name.split(',')[0]}</h3>
+      {p.rating!=null&&<div className="result-badges"><span>⭐ {p.rating}</span><span>👥 {p.userRatingCount||0}</span>{p.openNow!=null&&<span>{p.openNow?'● 營業中':'● 目前休息'}</span>}</div>}
+      <p><MapPin size={14}/>{p.display_name}</p>
+      <div className="result-actions">
+       <button onClick={()=>onAdd(item)}><Plus size={16}/>加入 Day</button>
+       <button className={favorite?'favorite active':'favorite'} onClick={()=>favorite?onRemoveFavorite(favorites.find(f=>f.placeSource===p.place_id)?.id||''):onFavorite(item)}>{favorite?<HeartOff size={16}/>:<Heart size={16}/>} {favorite?'取消收藏':'收藏'}</button>
+      </div>
+     </div>
+    </article>
+   })}</div>
+
+   <div className="card feature-card">
+    <div className="feature-head"><div><small>TRANSIT STATION</small><h2>地鐵站搜尋</h2></div><span className="bigemoji">🚇</span></div>
+    <input value={sq} onChange={e=>setSq(e.target.value)} placeholder="例如：海雲台、西面、梅田、難波"/>
+    <div className="station-list">{ss.map(s=><button key={s.join('-')} onClick={()=>onAdd({id:id(),type:'transport',start:'09:00',end:'09:30',title:`前往${s[2]}站`,transportMode:'metro',to:`${s[2]} ${s[3]} ${s[4]}`,line:`${s[0]} ${s[1]}`})}><span><b>{s[2]}</b><small>{s[3]}・{s[4]}</small></span><em>{s[0]}・{s[1]}</em><Plus size={17}/></button>)}</div>
+   </div>
+  </>}
+
+  {view==='favorites'&&<section className="favorite-center">
+   <article className="card favorite-summary"><div><small>MY FAVORITES</small><h2>我的收藏</h2><p>{trip.destination}・共 {favorites.length} 個地點</p></div><Heart size={34}/></article>
+   {favorites.length===0?<article className="card favorite-empty"><Heart size={32}/><h3>還沒有收藏地點</h3><p>搜尋店家或在行程卡右上角「⋯」中加入收藏。</p><button className="btn primary" onClick={()=>setView('search')}>開始搜尋</button></article>:
+   <div className="favorite-grid">{favorites.map(f=><article className="card favorite-card" key={f.id}>
+    {f.photoName&&<img src={`/api/place-photo?name=${encodeURIComponent(f.photoName)}&maxWidth=700`} alt={f.title} loading="lazy" onError={e=>e.currentTarget.style.display='none'}/>}
+    <div>
+     <span className="favorite-type">{placeCategory(f).emoji} {placeCategory(f).label}</span>
+     <h3>{f.title}</h3>
+     {f.rating!=null&&<p className="favorite-rating">⭐ {f.rating}・{f.userRatingCount||0} 則{f.openNow===true?'・營業中':f.openNow===false?'・目前休息':''}</p>}
+     {f.address&&<p className="favorite-address"><MapPin size={14}/>{shortAddress(f.address)}</p>}
+     <div className="favorite-actions">
+      <button onClick={()=>onAdd({...structuredClone(f),id:id(),start:'09:00',end:'10:00'})}><Plus size={16}/>加入 Day</button>
+      <button onClick={()=>window.open(gmap(f.address||f.title),'_blank')}><Navigation size={16}/>導航</button>
+      <button className="remove" onClick={()=>onRemoveFavorite(f.id)}><Trash2 size={16}/></button>
+     </div>
+    </div>
+   </article>)}</div>}
+  </section>}
+ </section>
 }
 
 
@@ -620,7 +717,7 @@ function PlaceCardDetails({item}:{item:Item}){
  </div>
 }
 
-function SmartItemMenu({item,index,total,onClose,onEdit,onCopy,onUp,onDown,onDelete}:{item:Item,index:number,total:number,onClose:()=>void,onEdit:()=>void,onCopy:()=>void,onUp:()=>void,onDown:()=>void,onDelete:()=>void}){
+function SmartItemMenu({item,index,total,isFavorite,onClose,onEdit,onCopy,onUp,onDown,onDelete,onFavorite}:{item:Item,index:number,total:number,isFavorite:boolean,onClose:()=>void,onEdit:()=>void,onCopy:()=>void,onUp:()=>void,onDown:()=>void,onDelete:()=>void,onFavorite:()=>void}){
  const isPlace=item.type==='place'||item.type==='meal'||item.type==='hotel'
  const isFlight=item.type==='flight'
  const query=item.address||item.title
@@ -630,7 +727,7 @@ function SmartItemMenu({item,index,total,onClose,onEdit,onCopy,onUp,onDown,onDel
  const call=()=>item.phone&&(location.href=`tel:${item.phone}`)
  return <ModalShell title={item.title} onClose={onClose}>
   <div className="smart-menu">
-   {isPlace&&<><button onClick={openGoogle}><Navigation/>Google Maps 導航</button><button onClick={openNaver}><Compass/>Naver Map 搜尋</button>{item.phone&&<button onClick={call}><Phone/>撥打店家電話</button>}{item.website&&<button onClick={openWebsite}><Globe2/>開啟官方網站</button>}<button onClick={onEdit}><RefreshCw/>更新地址與營業時間</button><button><Star/>收藏景點</button><button><ImagePlus/>加入照片</button><button><ReceiptText/>記錄消費</button><button><Ticket/>加入票券</button></>}
+   {isPlace&&<><button onClick={openGoogle}><Navigation/>Google Maps 導航</button><button onClick={openNaver}><Compass/>Naver Map 搜尋</button>{item.phone&&<button onClick={call}><Phone/>撥打店家電話</button>}{item.website&&<button onClick={openWebsite}><Globe2/>開啟官方網站</button>}<button onClick={onEdit}><RefreshCw/>更新地址與營業時間</button><button onClick={onFavorite}>{isFavorite?<HeartOff/>:<Heart/>}{isFavorite?'取消收藏':'加入我的收藏'}</button><button><ImagePlus/>加入照片</button><button><ReceiptText/>記錄消費</button><button><Ticket/>加入票券</button></>}
    {isFlight&&<><button onClick={onEdit}><Plane/>航班與航廈資訊</button><button><Ticket/>加入登機證</button><button><NotebookPen/>行李與座位備註</button></>}
    {!isPlace&&!isFlight&&<button onClick={onEdit}><NotebookPen/>查看與編輯詳細資料</button>}
    <div className="smart-menu-divider"/>
@@ -675,6 +772,28 @@ function App(){
  const active=s.trips.find(t=>t.id===s.active)||null
  const update=(n:State)=>{setS(n);if(!readOnly)save(n)}
  const updateWallet=(w:WalletData)=>{if(!active)return;const t={...active,wallet:w,updated:Date.now()};update({...s,trips:s.trips.map(x=>x.id===t.id?t:x)})}
+ const addFavorite=(item:Item)=>{
+  if(!active)return
+  const favorites=active.favorites||[]
+  const exists=favorites.some(f=>(item.placeSource&&f.placeSource===item.placeSource)||(f.title===item.title&&f.address===item.address))
+  if(exists){alert('這個地點已經收藏。');return}
+  const favorite={...structuredClone(item),id:id()}
+  const t={...active,favorites:[...favorites,favorite],updated:Date.now()}
+  update({...s,trips:s.trips.map(x=>x.id===t.id?t:x)})
+  alert('已加入我的收藏')
+ }
+ const removeFavorite=(favoriteId:string)=>{
+  if(!active)return
+  const t={...active,favorites:(active.favorites||[]).filter(f=>f.id!==favoriteId),updated:Date.now()}
+  update({...s,trips:s.trips.map(x=>x.id===t.id?t:x)})
+ }
+ const toggleFavorite=(item:Item)=>{
+  if(!active)return
+  const found=(active.favorites||[]).find(f=>(item.placeSource&&f.placeSource===item.placeSource)||(f.title===item.title&&f.address===item.address))
+  if(found)removeFavorite(found.id)
+  else addFavorite(item)
+ }
+
  useEffect(()=>{if(active&&!active.days.some(d=>d.id===tab))setTab(active.days[0]?.id||null)},[active?.id,active?.days.length])
  const saveTrip=(v:any)=>{
   if(form&&form!==true){
@@ -755,7 +874,7 @@ function App(){
      {!readOnly&&<div className="quick"><button className="btn primary" onClick={share}><Share2 size={18}/>分享行程</button><button className="btn yellow" onClick={()=>window.print()}><FileDown size={18}/>列印／PDF</button></div>}
     </>}
     {page==='itinerary'&&itinerary}
-    {page==='explore'&&<ExploreCenter trip={active} onAdd={addToCurrentDay}/>}
+    {page==='explore'&&<ExploreCenter trip={active} onAdd={addToCurrentDay} onFavorite={addFavorite} onRemoveFavorite={removeFavorite}/>}
     {page==='wallet'&&<WalletCenter trip={active} onChange={updateWallet}/>}
     {page==='translate'&&<TranslateCenter trip={active}/>}
     {page==='more'&&<section className="tools-grid"><button className="card tool-card" onClick={()=>setForm(active)}><Palette/><b>主題風格</b><span>10 種官方主題</span></button><button className="card tool-card" onClick={()=>window.print()}><FileDown/><b>旅行手冊</b><span>列印／PDF</span></button><button className="card tool-card" onClick={()=>setFlightOpen(true)}><Plane/><b>航班中心</b><span>查詢或手動建立航班</span></button><button className="card tool-card" onClick={()=>setTransitOpen(true)}><Compass/><b>交通中心</b><span>建立地鐵、公車與步行路線</span></button><button className="card tool-card" onClick={()=>setWeatherOpen(true)}><CloudSun/><b>天氣中心</b><span>七天天氣與手動更新</span></button></section>}
@@ -763,7 +882,7 @@ function App(){
    {weatherOpen&&<ModalShell title="天氣中心" onClose={()=>setWeatherOpen(false)}><Weather trip={active}/></ModalShell>}
    {flightOpen&&<ModalShell title="航班中心" onClose={()=>setFlightOpen(false)}><FlightCenter trip={active} onAdd={x=>{addToCurrentDay(x);setFlightOpen(false)}}/></ModalShell>}
    {transitOpen&&<ModalShell title="智慧交通中心" onClose={()=>setTransitOpen(false)}><TransitCenter trip={active} onAdd={x=>{addToCurrentDay(x);setTransitOpen(false)}}/></ModalShell>}
-   {smartMenu&&<SmartItemMenu item={smartMenu.item} index={smartMenu.index} total={smartMenu.total} onClose={()=>setSmartMenu(null)} onEdit={()=>{setItemEditor({dayId:smartMenu.dayId,item:smartMenu.item});setSmartMenu(null)}} onCopy={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'copy');setSmartMenu(null)}} onUp={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'up');setSmartMenu(null)}} onDown={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'down');setSmartMenu(null)}} onDelete={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'delete');setSmartMenu(null)}}/>}
+   {smartMenu&&<SmartItemMenu item={smartMenu.item} index={smartMenu.index} total={smartMenu.total} isFavorite={(active.favorites||[]).some(f=>(smartMenu.item.placeSource&&f.placeSource===smartMenu.item.placeSource)||(f.title===smartMenu.item.title&&f.address===smartMenu.item.address))} onClose={()=>setSmartMenu(null)} onEdit={()=>{setItemEditor({dayId:smartMenu.dayId,item:smartMenu.item});setSmartMenu(null)}} onCopy={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'copy');setSmartMenu(null)}} onUp={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'up');setSmartMenu(null)}} onDown={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'down');setSmartMenu(null)}} onDelete={()=>{itemAction(smartMenu.dayId,smartMenu.item.id,'delete');setSmartMenu(null)}} onFavorite={()=>{toggleFavorite(smartMenu.item);setSmartMenu(null)}}/>}
    <BottomNav page={page} onChange={setPage}/>
    {form&&<Form trip={form===true?undefined:form} onSave={saveTrip} onClose={()=>setForm(null)}/>}
    {itemEditor&&<ItemForm trip={active} initial={itemEditor.item} onSave={saveItem} onClose={()=>setItemEditor(null)}/>}

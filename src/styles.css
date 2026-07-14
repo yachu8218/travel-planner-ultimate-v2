@@ -442,3 +442,135 @@ form select{
 .body:has(.smart-place-card)>.item-rating{
   display:none!important;
 }
+
+/* =========================================================
+   v2.7.0 — 景點收藏中心
+   ========================================================= */
+.explore-tabs{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+  margin-bottom:12px;
+}
+.explore-tabs button{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  min-height:42px;
+  padding:8px;
+  border:2px solid var(--ink);
+  border-radius:9px;
+  background:var(--paper);
+  box-shadow:3px 3px 0 color-mix(in srgb,var(--ink) 78%,transparent);
+}
+.explore-tabs button.active{background:var(--primary)}
+.explore-tabs button span{
+  min-width:20px;
+  padding:2px 5px;
+  border-radius:999px;
+  background:#fff;
+  font-size:9px;
+}
+.rich-place-results{display:grid;gap:11px;margin:12px 0}
+.place-result-rich{padding:0!important;overflow:hidden}
+.place-result-rich>img{
+  width:100%;
+  height:130px;
+  object-fit:cover;
+  display:block;
+  border-bottom:2px solid var(--ink);
+}
+.place-result-content{display:grid;gap:7px;padding:12px}
+.place-result-content>small{font-size:9px;color:#6c7774}
+.place-result-content h3{margin:0;font-size:18px;color:var(--accent)}
+.place-result-content>p{
+  display:flex;
+  align-items:flex-start;
+  gap:5px;
+  margin:0;
+  font-size:10px;
+  line-height:1.4;
+}
+.result-badges{display:flex;gap:5px;flex-wrap:wrap}
+.result-badges span{
+  padding:3px 6px;
+  border:1px solid var(--ink);
+  border-radius:999px;
+  background:var(--soft);
+  font-size:9px;
+}
+.result-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.result-actions button{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  min-height:34px;
+  border:1.5px solid var(--ink);
+  border-radius:8px;
+  background:var(--paper);
+  font-size:10px;
+}
+.result-actions .favorite.active{background:#f1dada}
+.favorite-center{display:grid;gap:12px}
+.favorite-summary{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:var(--primary)!important;
+}
+.favorite-summary h2{margin:4px 0}
+.favorite-empty{
+  display:grid;
+  justify-items:center;
+  text-align:center;
+  gap:8px;
+  padding:28px 16px!important;
+}
+.favorite-empty h3,.favorite-empty p{margin:0}
+.favorite-grid{display:grid;gap:11px}
+.favorite-card{padding:0!important;overflow:hidden}
+.favorite-card>img{
+  width:100%;
+  height:120px;
+  object-fit:cover;
+  display:block;
+  border-bottom:2px solid var(--ink);
+}
+.favorite-card>div{display:grid;gap:7px;padding:12px}
+.favorite-type{
+  width:max-content;
+  padding:3px 7px;
+  border:1px solid var(--ink);
+  border-radius:999px;
+  background:var(--soft);
+  font-size:9px;
+}
+.favorite-card h3{margin:0;font-size:19px;color:var(--accent)}
+.favorite-rating{margin:0;font-size:10px}
+.favorite-address{
+  display:flex;
+  align-items:flex-start;
+  gap:5px;
+  margin:0;
+  font-size:10px;
+  line-height:1.4;
+}
+.favorite-actions{
+  display:grid;
+  grid-template-columns:1fr 1fr 38px;
+  gap:6px;
+}
+.favorite-actions button{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  min-height:34px;
+  border:1.5px solid var(--ink);
+  border-radius:8px;
+  background:var(--paper);
+  font-size:9px;
+}
+.favorite-actions .remove{background:#f2d6d6}
