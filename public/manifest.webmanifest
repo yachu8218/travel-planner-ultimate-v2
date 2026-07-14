@@ -1,5 +1,5 @@
 {
-  "name": "旅行手帳 Travel Planner Ultimate 2.7.0",
+  "name": "旅行手帳 Travel Planner Ultimate 2.8.0",
   "short_name": "旅行手帳",
   "start_url": "/",
   "display": "standalone",
@@ -20,5 +20,5 @@
       "purpose": "any maskable"
     }
   ],
-  "description": "景點收藏中心與 Google Places 探索整合"
+  "description": "AeroDataBox 智慧航班資料庫與離線快取"
 }

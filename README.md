@@ -1,21 +1,32 @@
-# Travel Planner Ultimate v2.7.0 — 景點收藏中心
+# Travel Planner Ultimate v2.8.0 — 智慧航班資料庫
 
-## 新增功能
+## 功能
+輸入航班號與搭乘日期後，可查詢：
 
-- 行程卡右上角「⋯」中的收藏功能正式啟用
-- 每趟旅行擁有獨立收藏清單
-- 探索頁新增「搜尋地點」與「我的收藏」分頁
-- Google Places 搜尋結果可收藏
-- 收藏項目可一鍵加入目前 Day
-- 可開啟地圖導航或刪除收藏
-- 收藏保留店名、照片、地址、評分、營業狀態等資料
+- 航空公司與航班號
+- 出發／抵達機場
+- 預定、修正或實際時間
+- Terminal
+- Gate
+- 行李轉盤
+- 航班狀態
+- 機型與機身編號
+- 飛行時間與距離
 
-## 更新方式
+同一航班號在同一天有多筆結果時，會先列出班次供選擇。
 
-解壓縮後覆蓋 GitHub 原檔案並 Commit，Cloudflare Pages 會自動部署。
-
-需保留 Cloudflare Secret：
+## AeroDataBox 設定
+本版使用 AeroDataBox 的 RapidAPI 版本。請先在 RapidAPI 訂閱 AeroDataBox，再把 RapidAPI Key 存入 Cloudflare Production Secret：
 
 ```text
-GOOGLE_PLACES_API_KEY
+AERODATABOX_API_KEY
+```
+
+金鑰尚未設定時，手動航班功能仍可正常使用。
+
+## 更新方式
+解壓縮後覆蓋 GitHub 原檔案並 Commit，Cloudflare Pages 會自動部署。請保留：
+
+```text
+functions/api/flight.ts
 ```

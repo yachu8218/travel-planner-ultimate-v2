@@ -18,7 +18,9 @@ type Item={
  transportMode?:TransportMode,from?:string,to?:string,durationMin?:number,distanceKm?:number,
  line?:string,flightNo?:string,address?:string,openingHours?:string,phone?:string,website?:string,
  lat?:number,lon?:number,rating?:number,userRatingCount?:number,openNow?:boolean,placeSource?:string,
- photoName?:string,primaryType?:string
+ photoName?:string,primaryType?:string,
+ flightDate?:string,flightStatus?:string,airline?:string,aircraftRegistration?:string,
+ departureScheduled?:string,arrivalScheduled?:string,flightUpdatedAt?:number
 }
 type Day={id:string,date:string,title:string,items:Item[]}
 type Traveler={id:string;name:string}
@@ -36,12 +38,21 @@ type PlaceResult={
  userRatingCount?:number;openNow?:boolean;source?:string;photoName?:string;primaryType?:string
 }
 type TranslationFavorite={id:string;source:string;translated:string;locale:string}
-type FlightResult={flightNo:string;airline?:string;status?:string;departure:{airport?:string;iata?:string;terminal?:string;gate?:string;scheduled?:string};arrival:{airport?:string;iata?:string;terminal?:string;gate?:string;baggage?:string;scheduled?:string};aircraft?:string;durationMin?:number;source?:string}
+type FlightMovement={
+ airport?:string;iata?:string;icao?:string;terminal?:string;gate?:string;baggage?:string;
+ scheduled?:string;revised?:string;runway?:string
+}
+type FlightResult={
+ id?:string;flightNo:string;airline?:string;airlineIata?:string;status?:string;codeshareStatus?:string;
+ departure:FlightMovement;arrival:FlightMovement;aircraft?:string;registration?:string;
+ durationMin?:number;distanceKm?:number;source?:string;updatedAt?:string
+}
 
 const KEY='travel-planner-ultimate-v2'
 const WEATHER_KEY='travel-planner-weather-v22'
 const RATE_KEY='travel-planner-rates-v23'
 const TRANSLATION_KEY='travel-planner-translation-v23'
+const FLIGHT_CACHE_KEY='travel-planner-flight-cache-v280'
 const oldKey='travelPlannerUltimatePortfolioV15'
 const id=()=>crypto.randomUUID?.()||`${Date.now()}-${Math.random()}`
 const themes:{id:ThemeId;name:string;desc:string;colors:string[]}[]=[
@@ -307,24 +318,165 @@ const gmap=(q:string)=>`https://www.google.com/maps/search/?api=1&query=${encode
 const nmap=(q:string)=>`https://map.naver.com/p/search/${encodeURIComponent(q)}`
 const ftime=(s?:string)=>s?new Date(s).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—'
 
+const flightStatusLabel=(status='')=>{
+ const map:Record<string,string>={
+  Unknown:'狀態未知',Expected:'預定',EnRoute:'飛行中',CheckIn:'辦理登機',
+  Boarding:'登機中',GateClosed:'登機門已關閉',Departed:'已起飛',
+  Arrived:'已抵達',Delayed:'延誤',Cancelled:'已取消',Diverted:'轉降'
+ }
+ return map[status]||status||'已取得資料'
+}
+const bestFlightTime=(m:FlightMovement)=>m.revised||m.runway||m.scheduled
+const timeOnly=(value?:string)=>value?new Date(value).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false}):'—'
+const fullFlightTime=(value?:string)=>value?new Date(value).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}):'—'
+
+function FlightResultCard({flight,selected,onSelect}:{key?:React.Key;flight:FlightResult;selected:boolean;onSelect:()=>void}){
+ const dep=flight.departure,arr=flight.arrival
+ return <button type="button" className={`flight-choice ${selected?'selected':''}`} onClick={onSelect}>
+  <div className="flight-choice-head">
+   <div><small>{flight.airline||'航空公司'}</small><h3>{flight.flightNo}</h3></div>
+   <span className={`flight-status status-${(flight.status||'unknown').toLowerCase()}`}>{flightStatusLabel(flight.status)}</span>
+  </div>
+  <div className="flight-choice-route">
+   <div><b>{dep.iata||'—'}</b><strong>{timeOnly(bestFlightTime(dep))}</strong><small>{dep.terminal?`T${dep.terminal}`:''}{dep.gate?`・Gate ${dep.gate}`:''}</small></div>
+   <div className="flight-line"><Plane size={19}/><span>{flight.durationMin?`${Math.floor(flight.durationMin/60)}小時${flight.durationMin%60}分`:''}</span></div>
+   <div><b>{arr.iata||'—'}</b><strong>{timeOnly(bestFlightTime(arr))}</strong><small>{arr.terminal?`T${arr.terminal}`:''}{arr.baggage?`・行李 ${arr.baggage}`:''}</small></div>
+  </div>
+ </button>
+}
+
 function FlightCenter({trip,onAdd}:{trip:Trip,onAdd:(x:Item)=>void}){
  const [flightNo,setFlightNo]=useState('')
  const [date,setDate]=useState(trip.start)
  const [loading,setLoading]=useState(false)
- const [result,setResult]=useState<FlightResult|null>(null)
+ const [results,setResults]=useState<FlightResult[]>([])
+ const [selected,setSelected]=useState(0)
  const [message,setMessage]=useState('')
  const [manual,setManual]=useState(false)
- const [m,setM]=useState({from:'',to:'',start:'12:00',end:'15:30',airline:'',terminalFrom:'',terminalTo:''})
- const search=async()=>{
-  const no=flightNo.trim().toUpperCase();if(!no){setMessage('請先輸入航班號碼。');return}
-  setLoading(true);setMessage('');setResult(null)
-  try{const r=await fetch(`/.netlify/functions/flight?flight=${encodeURIComponent(no)}&date=${encodeURIComponent(date)}`);const j=await r.json();if(!r.ok)throw new Error(j.message||'查詢失敗');setResult(j.flight)}
-  catch(e:any){setMessage(e?.message||'目前無法取得即時航班資料，可改用手動建立。');setManual(true)}finally{setLoading(false)}
+ const [m,setM]=useState({from:'',to:'',start:'12:00',end:'15:30',airline:'',terminalFrom:'',terminalTo:'',gate:'',baggage:''})
+
+ const search=async(force=false)=>{
+  const no=flightNo.replace(/\s+/g,'').trim().toUpperCase()
+  if(!no){setMessage('請先輸入航班號碼。');return}
+  setLoading(true);setMessage('正在查詢航班資料…');setResults([]);setSelected(0)
+  const cacheId=`${no}:${date}`
+  try{
+   const cache=JSON.parse(localStorage.getItem(FLIGHT_CACHE_KEY)||'{}')
+   if(!force&&cache[cacheId]&&Date.now()-cache[cacheId].at<30*60*1000){
+    setResults(cache[cacheId].results)
+    setMessage(`使用 ${new Date(cache[cacheId].at).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})} 的快取資料。`)
+    setLoading(false)
+    return
+   }
+   const r=await fetch(`/api/flight?flight=${encodeURIComponent(no)}&date=${encodeURIComponent(date)}`)
+   const j=await r.json()
+   if(!r.ok)throw new Error(j.message||'航班查詢失敗')
+   if(!Array.isArray(j.flights)||!j.flights.length)throw new Error(j.message||'找不到這個日期的航班。')
+   setResults(j.flights)
+   setMessage(j.flights.length>1?`找到 ${j.flights.length} 筆班次，請確認出發與抵達機場。`:`已取得航班資料・${j.provider||'AeroDataBox'}`)
+   localStorage.setItem(FLIGHT_CACHE_KEY,JSON.stringify({...cache,[cacheId]:{results:j.flights,at:Date.now()}}))
+  }catch(e:any){
+   const cache=JSON.parse(localStorage.getItem(FLIGHT_CACHE_KEY)||'{}')
+   if(cache[cacheId]?.results?.length){
+    setResults(cache[cacheId].results)
+    setMessage(`即時查詢失敗，使用上次快取：${e?.message||'連線錯誤'}`)
+   }else{
+    setMessage(e?.message||'目前無法取得航班資料，可改用手動建立。')
+    setManual(true)
+   }
+  }finally{setLoading(false)}
  }
- const addResult=()=>{if(!result)return;const dep=result.departure,arr=result.arrival;onAdd({id:id(),type:'flight',start:(dep.scheduled||'').slice(11,16)||'00:00',end:(arr.scheduled||'').slice(11,16)||'00:00',title:`${result.flightNo} ${result.airline||'航班'}`,flightNo:result.flightNo,transportMode:'flight',from:[dep.airport,dep.iata,dep.terminal&&`T${dep.terminal}`].filter(Boolean).join(' '),to:[arr.airport,arr.iata,arr.terminal&&`T${arr.terminal}`].filter(Boolean).join(' '),durationMin:result.durationMin,note:[result.status&&`狀態：${result.status}`,result.aircraft&&`機型：${result.aircraft}`,dep.gate&&`出發 Gate：${dep.gate}`,arr.baggage&&`行李轉盤：${arr.baggage}`].filter(Boolean).join('\n')})}
- const addManual=()=>{const no=flightNo.trim().toUpperCase()||'自訂航班';onAdd({id:id(),type:'flight',start:m.start,end:m.end,title:`${no} ${m.airline||'航班'}`,flightNo:no,transportMode:'flight',from:[m.from,m.terminalFrom&&`T${m.terminalFrom}`].filter(Boolean).join(' '),to:[m.to,m.terminalTo&&`T${m.terminalTo}`].filter(Boolean).join(' '),note:'手動建立的航班資料，請於出發前向航空公司確認。'})}
- return <section className="flight-center"><div className="flight-search card"><div className="feature-head"><div><small>FLIGHT SEARCH</small><h2>航班中心</h2></div><Plane size={30}/></div><p>可先手動建立航班；日後設定 API Key 後即可查詢即時資料。</p><div className="flight-fields"><label>航班號<input value={flightNo} onChange={e=>setFlightNo(e.target.value.toUpperCase())} placeholder="例如：KE2086"/></label><label>搭乘日期<div className="date-time-field"><CalendarDays size={18}/><input type="date" value={date} onChange={e=>setDate(e.target.value)}/></div></label></div><button className="btn primary full" onClick={search} disabled={loading}>{loading?<><RefreshCw className="spin" size={18}/>正在查詢</>:<><Search size={18}/>查詢即時航班</>}</button>{message&&<div className="service-message">{message}<small>現在不用設定金鑰，也能使用下方的手動航班表單。</small></div>}<button className="text-toggle" onClick={()=>setManual(!manual)}>{manual?'收起手動輸入':'＋ 手動建立航班'}</button>{manual&&<div className="manual-flight"><div className="flight-fields"><label>航空公司<input value={m.airline} onChange={e=>setM({...m,airline:e.target.value})} placeholder="例如：大韓航空"/></label><label>出發機場<input value={m.from} onChange={e=>setM({...m,from:e.target.value})} placeholder="桃園 TPE"/></label><label>抵達機場<input value={m.to} onChange={e=>setM({...m,to:e.target.value})} placeholder="釜山 PUS"/></label><label>出發航廈<input value={m.terminalFrom} onChange={e=>setM({...m,terminalFrom:e.target.value})} placeholder="例如：2"/></label><label>抵達航廈<input value={m.terminalTo} onChange={e=>setM({...m,terminalTo:e.target.value})}/></label><label>起飛時間<input type="time" value={m.start} onChange={e=>setM({...m,start:e.target.value})}/></label><label>抵達時間<input type="time" value={m.end} onChange={e=>setM({...m,end:e.target.value})}/></label></div><button className="btn yellow full" onClick={addManual}><Plus size={18}/>加入目前 Day</button></div>}</div>{result&&<article className="card flight-result"><div className="flight-result-head"><div><small>{result.airline||'AIRLINE'}</small><h2>{result.flightNo}</h2></div><span className="status-pill">{result.status||'已取得資料'}</span></div><div className="flight-route"><div><b>{result.departure.iata||'—'}</b><span>{result.departure.airport||'出發機場'}</span><strong>{ftime(result.departure.scheduled)}</strong><small>{result.departure.terminal?`Terminal ${result.departure.terminal}`:''}</small></div><Plane size={30}/><div><b>{result.arrival.iata||'—'}</b><span>{result.arrival.airport||'抵達機場'}</span><strong>{ftime(result.arrival.scheduled)}</strong><small>{result.arrival.terminal?`Terminal ${result.arrival.terminal}`:''}</small></div></div><button className="btn primary full" onClick={addResult}><Plus size={18}/>加入目前 Day</button></article>}</section>
+
+ const addResult=()=>{
+  const result=results[selected]
+  if(!result)return
+  const dep=result.departure,arr=result.arrival
+  const depTime=bestFlightTime(dep),arrTime=bestFlightTime(arr)
+  onAdd({
+   id:id(),type:'flight',
+   start:depTime?timeOnly(depTime):'00:00',end:arrTime?timeOnly(arrTime):'00:00',
+   title:`${result.airline||''} ${result.flightNo}`.trim(),
+   flightNo:result.flightNo,flightDate:date,flightStatus:result.status,airline:result.airline,
+   aircraftRegistration:result.registration,departureScheduled:depTime,arrivalScheduled:arrTime,
+   flightUpdatedAt:Date.now(),transportMode:'flight',
+   from:[dep.airport,dep.iata,dep.terminal&&`T${dep.terminal}`].filter(Boolean).join(' '),
+   to:[arr.airport,arr.iata,arr.terminal&&`T${arr.terminal}`].filter(Boolean).join(' '),
+   durationMin:result.durationMin,distanceKm:result.distanceKm,
+   note:[
+    `狀態：${flightStatusLabel(result.status)}`,
+    result.aircraft&&`機型：${result.aircraft}`,
+    result.registration&&`機身編號：${result.registration}`,
+    dep.gate&&`出發 Gate：${dep.gate}`,
+    arr.gate&&`抵達 Gate：${arr.gate}`,
+    arr.baggage&&`行李轉盤：${arr.baggage}`,
+    `資料來源：${result.source||'AeroDataBox'}`
+   ].filter(Boolean).join('\n')
+  })
+ }
+
+ const addManual=()=>{
+  const no=flightNo.trim().toUpperCase()||'自訂航班'
+  onAdd({
+   id:id(),type:'flight',start:m.start,end:m.end,title:`${m.airline||''} ${no}`.trim(),
+   flightNo:no,flightDate:date,airline:m.airline,transportMode:'flight',
+   from:[m.from,m.terminalFrom&&`T${m.terminalFrom}`,m.gate&&`Gate ${m.gate}`].filter(Boolean).join(' '),
+   to:[m.to,m.terminalTo&&`T${m.terminalTo}`,m.baggage&&`行李 ${m.baggage}`].filter(Boolean).join(' '),
+   note:'手動建立的航班資料，請於出發前向航空公司確認。'
+  })
+ }
+
+ return <section className="flight-center">
+  <div className="flight-search card">
+   <div className="feature-head"><div><small>FLIGHT DATABASE</small><h2>智慧航班資料庫</h2></div><Plane size={30}/></div>
+   <p>輸入航班號與搭乘日期，可查詢班表或即時狀態；同一班號有多條航線時會先讓你選擇。</p>
+   <div className="flight-fields">
+    <label>航班號<input value={flightNo} onChange={e=>setFlightNo(e.target.value.toUpperCase())} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="例如：KE2086、LJ751"/></label>
+    <label>搭乘日期<div className="date-time-field"><CalendarDays size={18}/><input type="date" value={date} onChange={e=>setDate(e.target.value)}/></div></label>
+   </div>
+   <div className="flight-search-actions">
+    <button className="btn primary" onClick={()=>search(false)} disabled={loading}>{loading?<><RefreshCw className="spin" size={18}/>查詢中</>:<><Search size={18}/>查詢航班</>}</button>
+    <button className="btn" onClick={()=>search(true)} disabled={loading||!flightNo}><RefreshCw size={17}/>強制更新</button>
+   </div>
+   {message&&<div className="service-message">{message}<small>尚未設定 AeroDataBox 金鑰時，可繼續使用下方手動航班。</small></div>}
+   <button className="text-toggle" onClick={()=>setManual(!manual)}>{manual?'收起手動輸入':'＋ 手動建立航班'}</button>
+   {manual&&<div className="manual-flight">
+    <div className="flight-fields">
+     <label>航空公司<input value={m.airline} onChange={e=>setM({...m,airline:e.target.value})} placeholder="例如：大韓航空"/></label>
+     <label>出發機場<input value={m.from} onChange={e=>setM({...m,from:e.target.value})} placeholder="桃園 TPE"/></label>
+     <label>抵達機場<input value={m.to} onChange={e=>setM({...m,to:e.target.value})} placeholder="釜山 PUS"/></label>
+     <label>出發航廈<input value={m.terminalFrom} onChange={e=>setM({...m,terminalFrom:e.target.value})} placeholder="例如：2"/></label>
+     <label>抵達航廈<input value={m.terminalTo} onChange={e=>setM({...m,terminalTo:e.target.value})}/></label>
+     <label>登機門<input value={m.gate} onChange={e=>setM({...m,gate:e.target.value})}/></label>
+     <label>行李轉盤<input value={m.baggage} onChange={e=>setM({...m,baggage:e.target.value})}/></label>
+     <label>起飛時間<div className="date-time-field"><Clock3 size={18}/><input type="time" value={m.start} onChange={e=>setM({...m,start:e.target.value})}/></div></label>
+     <label>抵達時間<div className="date-time-field"><Clock3 size={18}/><input type="time" value={m.end} onChange={e=>setM({...m,end:e.target.value})}/></div></label>
+    </div>
+    <button className="btn yellow full" onClick={addManual}><Plus size={18}/>加入目前 Day</button>
+   </div>}
+  </div>
+
+  {results.length>0&&<section className="flight-results-section">
+   <div className="result-section-head"><div><small>SEARCH RESULTS</small><h3>選擇正確班次</h3></div><span>{results.length} 筆</span></div>
+   <div className="flight-choice-list">{results.map((f,i)=><FlightResultCard key={f.id||`${f.flightNo}-${i}`} flight={f} selected={selected===i} onSelect={()=>setSelected(i)}/>)}</div>
+   <article className="card selected-flight-detail">
+    <div className="flight-result-head"><div><small>{results[selected].airline||'AIRLINE'}</small><h2>{results[selected].flightNo}</h2></div><span className="status-pill">{flightStatusLabel(results[selected].status)}</span></div>
+    <div className="flight-route">
+     <div><b>{results[selected].departure.iata||'—'}</b><span>{results[selected].departure.airport||'出發機場'}</span><strong>{fullFlightTime(bestFlightTime(results[selected].departure))}</strong><small>{results[selected].departure.terminal?`Terminal ${results[selected].departure.terminal}`:''} {results[selected].departure.gate?`Gate ${results[selected].departure.gate}`:''}</small></div>
+     <Plane size={30}/>
+     <div><b>{results[selected].arrival.iata||'—'}</b><span>{results[selected].arrival.airport||'抵達機場'}</span><strong>{fullFlightTime(bestFlightTime(results[selected].arrival))}</strong><small>{results[selected].arrival.terminal?`Terminal ${results[selected].arrival.terminal}`:''} {results[selected].arrival.baggage?`行李 ${results[selected].arrival.baggage}`:''}</small></div>
+    </div>
+    <div className="flight-meta">
+     {results[selected].durationMin&&<span>飛行約 {Math.floor(results[selected].durationMin/60)}小時 {results[selected].durationMin%60}分</span>}
+     {results[selected].aircraft&&<span>機型 {results[selected].aircraft}</span>}
+     {results[selected].registration&&<span>機身 {results[selected].registration}</span>}
+     <span>來源：{results[selected].source||'AeroDataBox'}</span>
+    </div>
+    <button className="btn primary full" onClick={addResult}><Plus size={18}/>加入目前 Day</button>
+   </article>
+  </section>}
+ </section>
 }
+
 function ExploreCenter({trip,onAdd,onFavorite,onRemoveFavorite}:{trip:Trip,onAdd:(x:Item)=>void,onFavorite:(x:Item)=>void,onRemoveFavorite:(id:string)=>void}){
  const [q,setQ]=useState('')
  const [loading,setLoading]=useState(false)

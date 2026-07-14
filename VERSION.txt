@@ -1,11 +1,17 @@
 Travel Planner Ultimate
-Version: 2.7.0 — 景點收藏中心
+Version: 2.8.0 — 智慧航班資料庫
 
 新增：
-- 智慧選單「加入我的收藏」正式啟用
-- 每趟旅行獨立保存收藏地點
-- 探索頁新增搜尋／我的收藏分頁
-- Google Places 搜尋結果可直接收藏
-- 收藏地點可一鍵加入目前 Day
-- 收藏地點可導航或移除
-- 收藏項目保留照片、地址、評分與營業狀態
+- Cloudflare Function 串接 AeroDataBox RapidAPI
+- 航班號＋日期查詢
+- 同航班號多筆班次選擇
+- 航空公司、起降機場、預定／修正時間
+- Terminal、Gate、行李轉盤
+- 航班狀態、機型、機身編號、飛行時間與距離
+- 查詢結果直接加入目前 Day
+- 航班資料 30 分鐘快取
+- 即時服務失敗時使用最後快取
+- 手動建立航班持續可用
+
+Cloudflare Secret：
+AERODATABOX_API_KEY
