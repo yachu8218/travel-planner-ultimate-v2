@@ -1,26 +1,24 @@
-# Travel Planner Ultimate v2.5.0 — 智慧行程卡
+# Travel Planner Ultimate v2.6.0 — Google Places 智慧搜尋整合
 
-## 智慧選單
-行程卡右上角的「⋯」現在會依類型顯示不同功能。
+## 新增功能
+在新增景點、餐廳、甜點或住宿時，輸入至少兩個字，App 會自動顯示 Google Places 建議清單。
 
-景點／餐廳／住宿：
-- Google Maps
-- Naver Map
-- 電話與網站
-- 更新地址與營業時間
-- 收藏、照片、消費、票券
-- 編輯、複製、排序與刪除
+選擇正確店家後，自動帶入：
+- 正式名稱
+- 地址
+- 營業時間
+- 目前是否營業
+- 電話
+- 官方網站
+- Google 評分與評價數量
 
-航班：
-- 航班與航廈資訊
-- 登機證
-- 行李與座位備註
-- 編輯與排序
+Google Places 無法使用或尚未設定金鑰時，仍可按「重新搜尋完整資料」，系統會退回免費地址搜尋。
 
-## 地點搜尋
-在景點、餐廳、甜點或住宿標題輸入名稱後，按「搜尋地點資料」，選擇正確結果即可自動帶入地址。
+## Cloudflare
+需設定 Secret：
 
-完整營業時間、電話、網站及評分需要後續串接 Google Places API；本版可先手動填寫，資料會顯示在行程卡中。
+```text
+GOOGLE_PLACES_API_KEY
+```
 
-## 更新
-解壓縮後覆蓋 GitHub 原檔案並 Commit，Cloudflare Pages 會自動部署。
+更新 ZIP 覆蓋 GitHub 後 Commit，Cloudflare Pages 會自動部署。

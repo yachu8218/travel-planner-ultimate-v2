@@ -17,7 +17,7 @@ type Item={
  id:string,type:TType,start:string,end:string,title:string,note?:string,checks?:Check[],
  transportMode?:TransportMode,from?:string,to?:string,durationMin?:number,distanceKm?:number,
  line?:string,flightNo?:string,address?:string,openingHours?:string,phone?:string,website?:string,
- lat?:number,lon?:number
+ lat?:number,lon?:number,rating?:number,userRatingCount?:number,openNow?:boolean,placeSource?:string
 }
 type Day={id:string,date:string,title:string,items:Item[]}
 type Traveler={id:string;name:string}
@@ -29,7 +29,11 @@ type Trip={
 }
 type State={version:2,active:string|null,trips:Trip[]}
 type WeatherDay={date:string,code:number,max:number,min:number,rain:number}
-type PlaceResult={place_id:string;display_name:string;lat:string;lon:string;type?:string;class?:string}
+type PlaceResult={
+ place_id:string;display_name:string;lat:string;lon:string;type?:string;class?:string;
+ name?:string;openingHours?:string;phone?:string;website?:string;rating?:number;
+ userRatingCount?:number;openNow?:boolean;source?:string
+}
 type TranslationFavorite={id:string;source:string;translated:string;locale:string}
 type FlightResult={flightNo:string;airline?:string;status?:string;departure:{airport?:string;iata?:string;terminal?:string;gate?:string;scheduled?:string};arrival:{airport?:string;iata?:string;terminal?:string;gate?:string;baggage?:string;scheduled?:string};aircraft?:string;durationMin?:number;source?:string}
 
@@ -113,29 +117,69 @@ function ItemForm({initial,onSave,onClose,trip}:{initial?:Item,onSave:(x:Item)=>
   durationMin:initial?.durationMin?.toString()||'',distanceKm:initial?.distanceKm?.toString()||'',
   line:initial?.line||'',flightNo:initial?.flightNo||'',address:initial?.address||'',
   openingHours:initial?.openingHours||'',phone:initial?.phone||'',website:initial?.website||'',
-  lat:initial?.lat,lon:initial?.lon
+  lat:initial?.lat,lon:initial?.lon,rating:initial?.rating,userRatingCount:initial?.userRatingCount,
+  openNow:initial?.openNow,placeSource:initial?.placeSource||''
  })
  const [placeLoading,setPlaceLoading]=useState(false)
+ const [suggestLoading,setSuggestLoading]=useState(false)
+ const [showSuggestions,setShowSuggestions]=useState(false)
  const [placeResults,setPlaceResults]=useState<PlaceResult[]>([])
  const [placeMessage,setPlaceMessage]=useState('')
  const isTransport=v.type==='transport'||v.type==='flight'
  const isPlace=v.type==='place'||v.type==='meal'||v.type==='hotel'
+ useEffect(()=>{
+  if(!isPlace||v.title.trim().length<2){
+   setShowSuggestions(false)
+   return
+  }
+  const timer=setTimeout(async()=>{
+   setSuggestLoading(true)
+   try{
+    const q=[v.title,trip?.destination].filter(Boolean).join(' ')
+    const r=await fetch(`/api/places?q=${encodeURIComponent(q)}&language=${encodeURIComponent(trip?.locale||'zh-TW')}&mode=autocomplete`)
+    const j=await r.json()
+    if(r.ok&&Array.isArray(j.results)){
+     setPlaceResults(j.results)
+     setShowSuggestions(j.results.length>0)
+    }
+   }catch{}
+   finally{setSuggestLoading(false)}
+  },450)
+  return()=>clearTimeout(timer)
+ },[v.title,trip?.destination,trip?.locale,isPlace])
+
  const searchPlace=async()=>{
   if(!v.title.trim()){setPlaceMessage('請先輸入店名或景點名稱。');return}
   setPlaceLoading(true);setPlaceMessage('');setPlaceResults([])
+  const q=[v.title,trip?.destination].filter(Boolean).join(' ')
   try{
-   const q=[v.title,trip?.destination].filter(Boolean).join(' ')
+   const r=await fetch(`/api/places?q=${encodeURIComponent(q)}&language=${encodeURIComponent(trip?.locale||'zh-TW')}`)
+   const j=await r.json()
+   if(r.ok&&Array.isArray(j.results)&&j.results.length){
+    setPlaceResults(j.results)
+    setPlaceMessage(j.configured?'使用 Google Places 搜尋，請選擇正確店家或分店。':'使用免費地址資料搜尋。')
+    return
+   }
+   if(j.message)setPlaceMessage(j.message)
+  }catch{}
+  try{
    const r=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&accept-language=zh-TW,zh,en,ko,ja&q=${encodeURIComponent(q)}`,{headers:{Accept:'application/json'}})
    if(!r.ok)throw new Error()
    const j=await r.json()
-   setPlaceResults(j)
+   setPlaceResults(j.map((p:PlaceResult)=>({...p,source:'OpenStreetMap'})))
    if(!j.length)setPlaceMessage('找不到符合結果，可改用 Google Maps 或 Naver Map 搜尋。')
+   else setPlaceMessage('目前使用免費地址資料；設定 Google Places 金鑰後可取得營業時間、電話與評分。')
   }catch{setPlaceMessage('目前無法搜尋地點，仍可手動輸入地址。')}
   finally{setPlaceLoading(false)}
  }
  const choosePlace=(p:PlaceResult)=>{
-  setV({...v,address:p.display_name,lat:Number(p.lat),lon:Number(p.lon)})
-  setPlaceResults([]);setPlaceMessage('已帶入地址。營業時間可先手動填寫，完整自動資料將於 Places API 串接後啟用。')
+  setV({...v,
+   title:p.name||v.title,address:p.display_name,lat:Number(p.lat),lon:Number(p.lon),
+   openingHours:p.openingHours||v.openingHours,phone:p.phone||v.phone,website:p.website||v.website,
+   rating:p.rating,userRatingCount:p.userRatingCount,openNow:p.openNow,placeSource:p.source||''
+  })
+  setPlaceResults([]);setShowSuggestions(false)
+  setPlaceMessage(p.source==='Google Places'?'已帶入 Google 店家資料。':'已帶入地址；營業時間與電話可手動補充。')
  }
  return <ModalShell title={initial?'編輯行程':'加入時間軸'} onClose={onClose}>
   <form onSubmit={e=>{e.preventDefault();onSave({
@@ -147,19 +191,21 @@ function ItemForm({initial,onSave,onClose,trip}:{initial?:Item,onSave:(x:Item)=>
    address:isPlace?v.address:undefined,openingHours:isPlace?v.openingHours:undefined,
    phone:isPlace?v.phone:undefined,website:isPlace?v.website:undefined,
    lat:isPlace?v.lat:undefined,lon:isPlace?v.lon:undefined,
+   rating:isPlace?v.rating:undefined,userRatingCount:isPlace?v.userRatingCount:undefined,
+   openNow:isPlace?v.openNow:undefined,placeSource:isPlace?v.placeSource:undefined,
    checks:v.type==='note'?v.note.split('\n').filter(Boolean).map((text,i)=>({id:initial?.checks?.[i]?.id||id(),text,done:initial?.checks?.[i]?.done||false})):undefined
   })}}>
    <label>行程類型<select value={v.type} onChange={e=>setV({...v,type:e.target.value as TType})}><option value="place">景點</option><option value="meal">餐廳／甜點</option><option value="hotel">住宿</option><option value="transport">交通</option><option value="flight">飛機</option><option value="note">便條紙</option></select></label>
    <div className="two"><label>開始時間<div className="date-time-field"><Clock3 size={18}/><input type="time" value={v.start} onChange={e=>setV({...v,start:e.target.value})}/></div></label><label>結束時間<div className="date-time-field"><Clock3 size={18}/><input type="time" value={v.end} onChange={e=>setV({...v,end:e.target.value})}/></div></label></div>
    {v.type==='transport'&&<label>交通方式<select value={v.transportMode} onChange={e=>setV({...v,transportMode:e.target.value as TransportMode})}>{Object.entries(modeLabel).filter(([k])=>k!=='flight').map(([k,label])=><option key={k} value={k}>{modeEmoji[k as TransportMode]} {label}</option>)}</select></label>}
    {isTransport&&<><div className="two"><label>出發地<input value={v.from} onChange={e=>setV({...v,from:e.target.value})} placeholder="例如：海雲台站"/></label><label>抵達地<input value={v.to} onChange={e=>setV({...v,to:e.target.value})} placeholder="例如：西面站"/></label></div><div className="two"><label>通勤時間（分鐘）<input type="number" min="0" value={v.durationMin} onChange={e=>setV({...v,durationMin:e.target.value})}/></label><label>距離（公里）<input type="number" min="0" step="0.1" value={v.distanceKm} onChange={e=>setV({...v,distanceKm:e.target.value})}/></label></div><label>{v.type==='flight'?'航班號碼':'路線／車次'}<input value={v.type==='flight'?v.flightNo:v.line} onChange={e=>v.type==='flight'?setV({...v,flightNo:e.target.value.toUpperCase()}):setV({...v,line:e.target.value})} placeholder={v.type==='flight'?'例如：KE2086':'例如：2號線、KTX 105'}/></label></>}
-   <label>標題<input required value={v.title} onChange={e=>setV({...v,title:e.target.value})} placeholder={v.type==='note'?'例如：機場待辦':v.type==='transport'?'例如：前往飯店':'輸入店名或景點名稱'}/></label>
+   <label>標題<div className="smart-title-field"><Search size={17}/><input required value={v.title} onChange={e=>{setV({...v,title:e.target.value});setShowSuggestions(true)}} onFocus={()=>placeResults.length&&setShowSuggestions(true)} placeholder={v.type==='note'?'例如：機場待辦':v.type==='transport'?'例如：前往飯店':'輸入店名或景點名稱'}/>{suggestLoading&&<RefreshCw className="spin" size={16}/>}</div></label>{isPlace&&showSuggestions&&placeResults.length>0&&<div className="autocomplete-list">{placeResults.map(p=><button type="button" key={p.place_id} onClick={()=>choosePlace(p)}><MapPin size={16}/><span><b>{p.name||p.display_name.split(',')[0]}</b><small>{p.display_name}</small>{p.rating!=null&&<em>⭐ {p.rating}（{p.userRatingCount||0}）{p.openNow===true?'・營業中':p.openNow===false?'・目前休息':''}</em>}</span></button>)}</div>}
    {isPlace&&<section className="place-enrich">
-    <button type="button" className="btn full" onClick={searchPlace} disabled={placeLoading}>{placeLoading?<><RefreshCw className="spin" size={17}/>搜尋中</>:<><Search size={17}/>搜尋地點資料</>}</button>
+    <button type="button" className="btn full" onClick={searchPlace} disabled={placeLoading}>{placeLoading?<><RefreshCw className="spin" size={17}/>搜尋中</>:<><Search size={17}/>重新搜尋完整資料</>}</button>
     {placeMessage&&<p className="place-message">{placeMessage}</p>}
-    {placeResults.length>0&&<div className="place-pick-list">{placeResults.map(p=><button type="button" key={p.place_id} onClick={()=>choosePlace(p)}><MapPin size={17}/><span>{p.display_name}</span></button>)}</div>}
+    {placeResults.length>0&&<div className="place-pick-list">{placeResults.map(p=><button type="button" key={p.place_id} onClick={()=>choosePlace(p)}><MapPin size={17}/><span><b>{p.name||p.display_name.split(',')[0]}</b><small>{p.display_name}</small>{p.rating!=null&&<em>⭐ {p.rating}（{p.userRatingCount||0}）{p.openNow===true?'・營業中':p.openNow===false?'・目前休息':''}</em>}</span></button>)}</div>}
     <label>地址<input value={v.address} onChange={e=>setV({...v,address:e.target.value})} placeholder="搜尋後可自動帶入，亦可手動輸入"/></label>
-    <label>營業時間<input value={v.openingHours} onChange={e=>setV({...v,openingHours:e.target.value})} placeholder="例如：每日 11:30–22:00"/></label>
+    <label>營業時間<input value={v.openingHours} onChange={e=>setV({...v,openingHours:e.target.value})} placeholder="例如：每日 11:30–22:00"/></label>{v.rating!=null&&<div className="place-auto-meta"><span>⭐ {v.rating}（{v.userRatingCount||0}則）</span>{v.openNow!=null&&<span>{v.openNow?'營業中':'目前休息'}</span>}{v.placeSource&&<small>資料來源：{v.placeSource}</small>}</div>}
     <div className="two"><label>電話<input value={v.phone} onChange={e=>setV({...v,phone:e.target.value})} placeholder="選填"/></label><label>官方網站<input value={v.website} onChange={e=>setV({...v,website:e.target.value})} placeholder="選填"/></label></div>
    </section>}
    <label>{v.type==='note'?'待辦內容（每行一項）':'備註'}<textarea rows={5} value={v.note} onChange={e=>setV({...v,note:e.target.value})}/></label>
@@ -583,7 +629,7 @@ function App(){
    <nav className="day-tabs" aria-label="每日行程分頁">{active.days.map((d,i)=><button key={d.id} className={current?.id===d.id?'active':''} onClick={()=>setTab(d.id)}><small>{d.date.slice(5)}</small><b>Day {i+1}</b></button>)}</nav>
    {current&&<section className="card day single-day"><div className="day-head"><div><small>{new Date(current.date+'T12:00:00').toLocaleDateString('zh-TW',{weekday:'long'})}</small><h2>{current.title}・{current.date.slice(5)}</h2></div>{!readOnly&&<button className="icon" onClick={()=>setItemEditor({dayId:current.id})}><Plus/></button>}</div>
     <div className="day-summary"><span>📌 {current.items.length} 個安排</span><span>🚉 {transportCount} 段交通</span><span>⏱ {totalDuration} 分鐘通勤</span></div>
-    <div className="timeline">{current.items.length?current.items.map((i,itemIndex)=><article className={`item ${i.type}`} key={i.id}><div className="time">{i.start}<span>～</span>{i.end}</div><div className="body"><div className="item-head"><div><small>{typeName[i.type].toUpperCase()}</small><h3>{i.title}</h3></div>{!readOnly&&<button className="mini-more" aria-label="更多功能" onClick={()=>setSmartMenu({dayId:current.id,item:i,index:itemIndex,total:current.items.length})}><MoreHorizontal size={18}/></button>}</div>{(i.type==='transport'||i.type==='flight')&&<TransportDetails item={i}/>} {i.address&&<p className="item-address"><MapPin size={14}/>{i.address}</p>}{i.openingHours&&<p className="item-hours"><Clock3 size={14}/>{i.openingHours}</p>}{i.note&&i.type!=='note'&&<p>{i.note}</p>}{i.checks&&<div className="checks"><div className="note-heading"><StickyNote size={17}/>便條待辦</div>{i.checks.map(c=><label key={c.id}><input disabled={readOnly} type="checkbox" checked={c.done} onChange={()=>toggle(current.id,i.id,c.id)}/><span>{c.text}</span></label>)}</div>}
+    <div className="timeline">{current.items.length?current.items.map((i,itemIndex)=><article className={`item ${i.type}`} key={i.id}><div className="time">{i.start}<span>～</span>{i.end}</div><div className="body"><div className="item-head"><div><small>{typeName[i.type].toUpperCase()}</small><h3>{i.title}</h3></div>{!readOnly&&<button className="mini-more" aria-label="更多功能" onClick={()=>setSmartMenu({dayId:current.id,item:i,index:itemIndex,total:current.items.length})}><MoreHorizontal size={18}/></button>}</div>{(i.type==='transport'||i.type==='flight')&&<TransportDetails item={i}/>} {i.address&&<p className="item-address"><MapPin size={14}/>{i.address}</p>}{i.openingHours&&<p className="item-hours"><Clock3 size={14}/>{i.openingHours}</p>}{i.rating!=null&&<p className="item-rating"><Star size={14}/> {i.rating}（{i.userRatingCount||0}）{i.openNow===true?'・營業中':i.openNow===false?'・目前休息':''}</p>}{i.note&&i.type!=='note'&&<p>{i.note}</p>}{i.checks&&<div className="checks"><div className="note-heading"><StickyNote size={17}/>便條待辦</div>{i.checks.map(c=><label key={c.id}><input disabled={readOnly} type="checkbox" checked={c.done} onChange={()=>toggle(current.id,i.id,c.id)}/><span>{c.text}</span></label>)}</div>}
     </div></article>):<p className="empty">這一天還沒有行程，按右上角＋加入。</p>}</div>
     <div className="day-pager"><button className="btn" disabled={idx<=0} onClick={()=>setTab(active.days[idx-1]?.id)}><ChevronLeft size={18}/>前一天</button><span>{idx+1} / {active.days.length}</span><button className="btn" disabled={idx>=active.days.length-1} onClick={()=>setTab(active.days[idx+1]?.id)}>後一天<ChevronRight size={18}/></button></div>
    </section>}

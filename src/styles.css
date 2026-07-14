@@ -206,3 +206,66 @@ html,body{width:100%;max-width:100%;overflow-x:hidden!important}
 .smart-menu button.danger{background:#f4d5d5}
 .smart-menu-divider{border-top:2px dashed var(--primary);margin:5px 0}
 .item-actions{display:none!important}
+
+/* v2.5.1 — 智慧地點資料 */
+.place-pick-list button span{display:grid;gap:3px}
+.place-pick-list button span b{font-size:13px}
+.place-pick-list button span small{font-size:10px;color:#697572}
+.place-pick-list button span em{font-size:10px;font-style:normal;color:var(--accent)}
+.place-auto-meta{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin:7px 0}
+.place-auto-meta span{padding:4px 7px;border:1px solid var(--ink);border-radius:999px;background:var(--soft);font-size:10px}
+.place-auto-meta small{width:100%;color:#6d7774}
+.item-rating{display:flex;align-items:center;gap:4px;font-size:11px!important;margin:5px 0!important}
+
+/* v2.6.0 — Google Places 智慧搜尋整合 */
+.smart-title-field{
+  width:100%;
+  height:46px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:5px;
+  padding:0 10px;
+  border:2px solid var(--ink);
+  border-radius:8px;
+  background:#fff;
+  box-shadow:2px 2px 0 color-mix(in srgb,var(--ink) 78%,transparent);
+}
+.smart-title-field input{
+  flex:1 1 auto;
+  min-width:0;
+  height:42px!important;
+  border:0!important;
+  box-shadow:none!important;
+  margin:0!important;
+  padding:0!important;
+  background:transparent!important;
+}
+.autocomplete-list{
+  display:grid;
+  gap:7px;
+  margin:7px 0 10px;
+  max-height:310px;
+  overflow:auto;
+  padding:7px;
+  border:2px solid var(--ink);
+  border-radius:9px;
+  background:var(--paper);
+  box-shadow:3px 3px 0 color-mix(in srgb,var(--ink) 78%,transparent);
+}
+.autocomplete-list button{
+  display:grid;
+  grid-template-columns:auto 1fr;
+  align-items:flex-start;
+  gap:8px;
+  width:100%;
+  padding:9px;
+  border:1.5px solid var(--ink);
+  border-radius:8px;
+  background:#fff;
+  text-align:left;
+}
+.autocomplete-list button span{display:grid;gap:3px}
+.autocomplete-list b{font-size:13px}
+.autocomplete-list small{font-size:10px;color:#697572;line-height:1.35}
+.autocomplete-list em{font-size:10px;font-style:normal;color:var(--accent)}
