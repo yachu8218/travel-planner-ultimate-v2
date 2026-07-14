@@ -1,4 +1,2 @@
 Travel Planner Ultimate
-Version: 2.4.0 — 智慧交通中心
-
-新增智慧交通中心；修正航班日期欄超出外框。
+Version: 2.4.1 — Form Refinement
