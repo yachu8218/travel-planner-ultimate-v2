@@ -1,12 +1,15 @@
 Travel Planner Ultimate
-Version: 2.6.1 — Search & Form Fix
+Version: 2.6.2 — Smart Place Card UI
 
-修正：
-- Google Places 搜尋顯示實際設定狀態
-- Secret 未在 Production 生效時提供明確提示
-- 韓國目的地自動加入韓文城市名稱
-- 依序嘗試店名＋城市、店名＋原目的地、只搜尋店名
-- 免費地址搜尋同步採用多組關鍵字
-- 交通方式下拉選單高度增加
-- 修正 iPhone 上文字與 Emoji 被裁切
-- 所有下拉選單統一高度與內距
+新增與美化：
+- 店名放大、加粗並使用主題強調色
+- 類別 Badge
+- 評分、評論數、營業狀態 Badge
+- 今日營業時間摘要
+- 完整營業時間展開／收合
+- 地址精簡與完整地址展開
+- Google Maps、NAVER Map 快捷按鈕
+- 電話可直接撥打
+- Google Places 店家照片
+- 無照片時顯示地點圖示
+- 地點卡淡入動畫

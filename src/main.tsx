@@ -17,7 +17,8 @@ type Item={
  id:string,type:TType,start:string,end:string,title:string,note?:string,checks?:Check[],
  transportMode?:TransportMode,from?:string,to?:string,durationMin?:number,distanceKm?:number,
  line?:string,flightNo?:string,address?:string,openingHours?:string,phone?:string,website?:string,
- lat?:number,lon?:number,rating?:number,userRatingCount?:number,openNow?:boolean,placeSource?:string
+ lat?:number,lon?:number,rating?:number,userRatingCount?:number,openNow?:boolean,placeSource?:string,
+ photoName?:string,primaryType?:string
 }
 type Day={id:string,date:string,title:string,items:Item[]}
 type Traveler={id:string;name:string}
@@ -32,7 +33,7 @@ type WeatherDay={date:string,code:number,max:number,min:number,rain:number}
 type PlaceResult={
  place_id:string;display_name:string;lat:string;lon:string;type?:string;class?:string;
  name?:string;openingHours?:string;phone?:string;website?:string;rating?:number;
- userRatingCount?:number;openNow?:boolean;source?:string
+ userRatingCount?:number;openNow?:boolean;source?:string;photoName?:string;primaryType?:string
 }
 type TranslationFavorite={id:string;source:string;translated:string;locale:string}
 type FlightResult={flightNo:string;airline?:string;status?:string;departure:{airport?:string;iata?:string;terminal?:string;gate?:string;scheduled?:string};arrival:{airport?:string;iata?:string;terminal?:string;gate?:string;baggage?:string;scheduled?:string};aircraft?:string;durationMin?:number;source?:string}
@@ -118,7 +119,7 @@ function ItemForm({initial,onSave,onClose,trip}:{initial?:Item,onSave:(x:Item)=>
   line:initial?.line||'',flightNo:initial?.flightNo||'',address:initial?.address||'',
   openingHours:initial?.openingHours||'',phone:initial?.phone||'',website:initial?.website||'',
   lat:initial?.lat,lon:initial?.lon,rating:initial?.rating,userRatingCount:initial?.userRatingCount,
-  openNow:initial?.openNow,placeSource:initial?.placeSource||''
+  openNow:initial?.openNow,placeSource:initial?.placeSource||'',photoName:initial?.photoName||'',primaryType:initial?.primaryType||''
  })
  const [placeLoading,setPlaceLoading]=useState(false)
  const [suggestLoading,setSuggestLoading]=useState(false)
@@ -219,7 +220,7 @@ function ItemForm({initial,onSave,onClose,trip}:{initial?:Item,onSave:(x:Item)=>
   setV({...v,
    title:p.name||v.title,address:p.display_name,lat:Number(p.lat),lon:Number(p.lon),
    openingHours:p.openingHours||v.openingHours,phone:p.phone||v.phone,website:p.website||v.website,
-   rating:p.rating,userRatingCount:p.userRatingCount,openNow:p.openNow,placeSource:p.source||''
+   rating:p.rating,userRatingCount:p.userRatingCount,openNow:p.openNow,placeSource:p.source||'',photoName:p.photoName||'',primaryType:p.primaryType||''
   })
   setPlaceResults([]);setShowSuggestions(false)
   setPlaceMessage(p.source==='Google Places'?'已帶入 Google 店家資料。':'已帶入地址；營業時間與電話可手動補充。')
@@ -236,6 +237,7 @@ function ItemForm({initial,onSave,onClose,trip}:{initial?:Item,onSave:(x:Item)=>
    lat:isPlace?v.lat:undefined,lon:isPlace?v.lon:undefined,
    rating:isPlace?v.rating:undefined,userRatingCount:isPlace?v.userRatingCount:undefined,
    openNow:isPlace?v.openNow:undefined,placeSource:isPlace?v.placeSource:undefined,
+   photoName:isPlace?v.photoName:undefined,primaryType:isPlace?v.primaryType:undefined,
    checks:v.type==='note'?v.note.split('\n').filter(Boolean).map((text,i)=>({id:initial?.checks?.[i]?.id||id(),text,done:initial?.checks?.[i]?.done||false})):undefined
   })}}>
    <label>行程類型<select value={v.type} onChange={e=>setV({...v,type:e.target.value as TType})}><option value="place">景點</option><option value="meal">餐廳／甜點</option><option value="hotel">住宿</option><option value="transport">交通</option><option value="flight">飛機</option><option value="note">便條紙</option></select></label>
@@ -559,6 +561,65 @@ function TransitCenter({trip,onAdd}:{trip:Trip,onAdd:(item:Item)=>void}){
  return <section className="transit-center"><article className="card transit-hero"><div className="feature-head"><div><small>SMART TRANSIT</small><h2>智慧交通中心</h2></div><span>{modeEmoji[mode]}</span></div><p>建立交通卡後可直接加入目前 Day，並可開啟地圖導航。</p></article><article className="card transit-builder"><label>交通方式<select value={mode} onChange={e=>setMode(e.target.value as TransportMode)}>{Object.entries(modeLabel).map(([k,v])=><option key={k} value={k}>{modeEmoji[k as TransportMode]} {v}</option>)}</select></label><div className="transit-two"><label>出發地<input value={from} onChange={e=>setFrom(e.target.value)} placeholder="例如：西面站"/></label><label>抵達地<input value={to} onChange={e=>setTo(e.target.value)} placeholder="例如：海雲台站"/></label></div><div className="transit-two"><label>開始時間<div className="date-time-field"><Clock3 size={18}/><input type="time" value={start} onChange={e=>setStart(e.target.value)}/></div></label><label>結束時間<div className="date-time-field"><Clock3 size={18}/><input type="time" value={end} onChange={e=>setEnd(e.target.value)}/></div></label></div><div className="transit-three"><label>時間（分鐘）<input type="number" min="0" value={duration} onChange={e=>setDuration(e.target.value)}/></label><label>距離（公里）<input type="number" min="0" step="0.1" value={distance} onChange={e=>setDistance(e.target.value)}/></label><label>費用（{trip.currency}）<input type="number" min="0" value={fare} onChange={e=>setFare(e.target.value)}/></label></div><label>路線／車次<input value={line} onChange={e=>setLine(e.target.value)} placeholder="例如：2號線、KTX 105"/></label><label>備註<textarea rows={3} value={note} onChange={e=>setNote(e.target.value)} placeholder="月台、出口、轉乘或集合資訊"/></label><div className="transit-actions"><button className="btn" onClick={g} disabled={!from||!to}>Google Maps</button><button className="btn" onClick={n} disabled={!from||!to}>Naver Map</button><button className="btn primary" onClick={add}><Plus size={17}/>加入目前 Day</button></div></article></section>
 }
 
+
+const placeCategory=(item:Item)=>{
+ const t=(item.primaryType||'').toLowerCase()
+ if(item.type==='meal'){
+  if(/cafe|coffee/.test(t))return {emoji:'☕',label:'咖啡'}
+  if(/bakery|dessert/.test(t))return {emoji:'🧁',label:'甜點'}
+  return {emoji:'🍽️',label:'餐廳'}
+ }
+ if(item.type==='hotel')return {emoji:'🏨',label:'住宿'}
+ if(/museum|tourist|park|temple|church|landmark/.test(t))return {emoji:'🏛️',label:'景點'}
+ if(/shopping|store|mall/.test(t))return {emoji:'🛍️',label:'購物'}
+ return {emoji:'📍',label:'景點'}
+}
+const shortAddress=(address='')=>{
+ if(!address)return ''
+ const parts=address.split(',').map(x=>x.trim()).filter(Boolean)
+ return parts.slice(0,3).join(', ')
+}
+const todayHours=(hours='')=>{
+ if(!hours)return ''
+ const labels=['星期日','星期一','星期二','星期三','星期四','星期五','星期六']
+ const english=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+ const korean=['일요일','월요일','화요일','수요일','목요일','금요일','토요일']
+ const day=new Date().getDay()
+ const segments=hours.split('／')
+ const found=segments.find(s=>s.includes(labels[day])||s.includes(english[day])||s.includes(korean[day]))
+ return found||segments[0]||''
+}
+function PlaceCardDetails({item}:{item:Item}){
+ const [showAddress,setShowAddress]=useState(false)
+ const [showHours,setShowHours]=useState(false)
+ const category=placeCategory(item)
+ const query=item.address||item.title
+ const photoUrl=item.photoName?`/api/place-photo?name=${encodeURIComponent(item.photoName)}&maxWidth=900`:'' 
+ const google=()=>window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`,'_blank')
+ const naver=()=>window.open(`https://map.naver.com/p/search/${encodeURIComponent(query)}`,'_blank')
+ return <div className="smart-place-card">
+  <div className="place-photo-wrap">
+   {photoUrl?<img src={photoUrl} alt={item.title} loading="lazy" onError={e=>{(e.currentTarget.parentElement as HTMLElement).classList.add('photo-error')}}/>:<div className="place-photo-fallback">{category.emoji}</div>}
+  </div>
+  <div className="place-card-head">
+   <span className="place-category-badge">{category.emoji} {category.label}</span>
+   <h3 className="place-title">{item.title}</h3>
+  </div>
+  {item.rating!=null&&<div className="place-badges">
+   <span>⭐ {item.rating}</span>
+   <span>👥 {item.userRatingCount||0}則</span>
+   {item.openNow!=null&&<span className={item.openNow?'open':'closed'}>{item.openNow?'● 營業中':'● 目前休息'}</span>}
+  </div>}
+  {item.address&&<div className="place-detail-row"><MapPin size={16}/><div><b>{showAddress?item.address:shortAddress(item.address)}</b>{item.address!==shortAddress(item.address)&&<button onClick={()=>setShowAddress(!showAddress)}>{showAddress?'收合地址':'查看完整地址'}</button>}</div></div>}
+  {item.openingHours&&<div className="place-detail-row"><Clock3 size={16}/><div><b>{showHours?item.openingHours:todayHours(item.openingHours)}</b><button onClick={()=>setShowHours(!showHours)}>{showHours?'收合營業時間':'顯示完整營業時間'}</button></div></div>}
+  {item.phone&&<a className="place-phone" href={`tel:${item.phone}`}><Phone size={16}/>{item.phone}</a>}
+  <div className="place-map-actions">
+   <button onClick={google}><Navigation size={16}/>Google Maps</button>
+   <button onClick={naver}><Compass size={16}/>NAVER Map</button>
+  </div>
+ </div>
+}
+
 function SmartItemMenu({item,index,total,onClose,onEdit,onCopy,onUp,onDown,onDelete}:{item:Item,index:number,total:number,onClose:()=>void,onEdit:()=>void,onCopy:()=>void,onUp:()=>void,onDown:()=>void,onDelete:()=>void}){
  const isPlace=item.type==='place'||item.type==='meal'||item.type==='hotel'
  const isFlight=item.type==='flight'
@@ -672,7 +733,7 @@ function App(){
    <nav className="day-tabs" aria-label="每日行程分頁">{active.days.map((d,i)=><button key={d.id} className={current?.id===d.id?'active':''} onClick={()=>setTab(d.id)}><small>{d.date.slice(5)}</small><b>Day {i+1}</b></button>)}</nav>
    {current&&<section className="card day single-day"><div className="day-head"><div><small>{new Date(current.date+'T12:00:00').toLocaleDateString('zh-TW',{weekday:'long'})}</small><h2>{current.title}・{current.date.slice(5)}</h2></div>{!readOnly&&<button className="icon" onClick={()=>setItemEditor({dayId:current.id})}><Plus/></button>}</div>
     <div className="day-summary"><span>📌 {current.items.length} 個安排</span><span>🚉 {transportCount} 段交通</span><span>⏱ {totalDuration} 分鐘通勤</span></div>
-    <div className="timeline">{current.items.length?current.items.map((i,itemIndex)=><article className={`item ${i.type}`} key={i.id}><div className="time">{i.start}<span>～</span>{i.end}</div><div className="body"><div className="item-head"><div><small>{typeName[i.type].toUpperCase()}</small><h3>{i.title}</h3></div>{!readOnly&&<button className="mini-more" aria-label="更多功能" onClick={()=>setSmartMenu({dayId:current.id,item:i,index:itemIndex,total:current.items.length})}><MoreHorizontal size={18}/></button>}</div>{(i.type==='transport'||i.type==='flight')&&<TransportDetails item={i}/>} {i.address&&<p className="item-address"><MapPin size={14}/>{i.address}</p>}{i.openingHours&&<p className="item-hours"><Clock3 size={14}/>{i.openingHours}</p>}{i.rating!=null&&<p className="item-rating"><Star size={14}/> {i.rating}（{i.userRatingCount||0}）{i.openNow===true?'・營業中':i.openNow===false?'・目前休息':''}</p>}{i.note&&i.type!=='note'&&<p>{i.note}</p>}{i.checks&&<div className="checks"><div className="note-heading"><StickyNote size={17}/>便條待辦</div>{i.checks.map(c=><label key={c.id}><input disabled={readOnly} type="checkbox" checked={c.done} onChange={()=>toggle(current.id,i.id,c.id)}/><span>{c.text}</span></label>)}</div>}
+    <div className="timeline">{current.items.length?current.items.map((i,itemIndex)=><article className={`item ${i.type}`} key={i.id}><div className="time">{i.start}<span>～</span>{i.end}</div><div className="body"><div className="item-head"><div><small>{typeName[i.type].toUpperCase()}</small><h3>{i.title}</h3></div>{!readOnly&&<button className="mini-more" aria-label="更多功能" onClick={()=>setSmartMenu({dayId:current.id,item:i,index:itemIndex,total:current.items.length})}><MoreHorizontal size={18}/></button>}</div>{(i.type==='transport'||i.type==='flight')&&<TransportDetails item={i}/>} {(i.type==='place'||i.type==='meal'||i.type==='hotel')?<PlaceCardDetails item={i}/>:<>{i.address&&<p className="item-address"><MapPin size={14}/>{i.address}</p>}{i.openingHours&&<p className="item-hours"><Clock3 size={14}/>{i.openingHours}</p>}{i.rating!=null&&<p className="item-rating"><Star size={14}/> {i.rating}（{i.userRatingCount||0}）{i.openNow===true?'・營業中':i.openNow===false?'・目前休息':''}</p>}</>}{i.note&&i.type!=='note'&&<p>{i.note}</p>}{i.checks&&<div className="checks"><div className="note-heading"><StickyNote size={17}/>便條待辦</div>{i.checks.map(c=><label key={c.id}><input disabled={readOnly} type="checkbox" checked={c.done} onChange={()=>toggle(current.id,i.id,c.id)}/><span>{c.text}</span></label>)}</div>}
     </div></article>):<p className="empty">這一天還沒有行程，按右上角＋加入。</p>}</div>
     <div className="day-pager"><button className="btn" disabled={idx<=0} onClick={()=>setTab(active.days[idx-1]?.id)}><ChevronLeft size={18}/>前一天</button><span>{idx+1} / {active.days.length}</span><button className="btn" disabled={idx>=active.days.length-1} onClick={()=>setTab(active.days[idx+1]?.id)}>後一天<ChevronRight size={18}/></button></div>
    </section>}

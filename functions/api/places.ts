@@ -34,7 +34,9 @@ const mapPlace = (p: any) => {
     rating: p.rating,
     userRatingCount: p.userRatingCount,
     openNow: p.currentOpeningHours?.openNow ?? p.regularOpeningHours?.openNow,
-    source: "Google Places"
+    source: "Google Places",
+    photoName: p.photos?.[0]?.name || "",
+    primaryType: p.primaryType || ""
   }
 }
 
@@ -81,7 +83,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
           "places.websiteUri",
           "places.rating",
           "places.userRatingCount",
-          "places.businessStatus"
+          "places.businessStatus",
+          "places.photos",
+          "places.primaryType"
         ].join(",")
       },
       body: JSON.stringify(body)

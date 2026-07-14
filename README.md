@@ -1,16 +1,25 @@
-# Travel Planner Ultimate v2.6.1 — Search & Form Fix
+# Travel Planner Ultimate v2.6.2 — Smart Place Card UI
 
-## 地點搜尋
-搜尋失敗時會清楚顯示：
-- Cloudflare 是否讀取到 `GOOGLE_PLACES_API_KEY`
-- Google Places 是否回傳錯誤
-- 是否正在使用免費地址搜尋
+## 本次更新
 
-韓國旅行會把釜山、首爾等中文目的地轉成韓文城市名稱後搜尋，並依序嘗試多種關鍵字。
+地點、餐廳、甜點與住宿行程卡改為智慧地點卡：
 
-## 表單修正
-交通方式與其他下拉選單高度改為 52px，修正 iPhone Safari 文字及 Emoji 被裁切。
+- 店名使用較大、較粗且不同顏色的文字
+- 類別標籤
+- 評分、評論數與營業狀態標籤
+- 今日營業時間摘要
+- 完整營業時間可展開
+- 地址可展開完整內容
+- Google Maps／NAVER Map 快捷導航
+- 電話可直接撥號
+- Google Places 店家照片
 
-## 更新
+## 更新方式
+
 解壓縮後覆蓋 GitHub 原檔案並 Commit，Cloudflare Pages 會自動部署。
-Secret deployment refresh v2
+
+需保留既有 Secret：
+
+```text
+GOOGLE_PLACES_API_KEY
+```

@@ -1,5 +1,5 @@
 {
-  "name": "旅行手帳 Travel Planner Ultimate 2.6.1",
+  "name": "旅行手帳 Travel Planner Ultimate 2.6.2",
   "short_name": "旅行手帳",
   "start_url": "/",
   "display": "standalone",
@@ -20,5 +20,5 @@
       "purpose": "any maskable"
     }
   ],
-  "description": "地點搜尋診斷與交通選單顯示修正版"
+  "description": "智慧地點卡片、店家照片與營業時間收合"
 }
