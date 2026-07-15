@@ -1129,6 +1129,59 @@ function FlightCardDetails({item,onRefresh,refreshing}:{item:Item;onRefresh?:()=
  </div>
 }
 
+
+const connectorVisual=(current:Item,next?:Item)=>{
+ if(current.type==='flight'||next?.type==='flight')return {emoji:'✈️',label:'航班移動',className:'flight'}
+ if(current.type==='meal')return {emoji:'🍽️',label:'用餐後前往下一站',className:'meal'}
+ if(current.type==='hotel')return {emoji:'🌙',label:'住宿與休息',className:'hotel'}
+ if(current.type==='transport'){
+  const mode=current.transportMode||'metro'
+  const map:Record<TransportMode,{emoji:string;label:string;className:string}>={
+   walk:{emoji:'🚶',label:'步行前往下一站',className:'walk'},
+   metro:{emoji:'🚇',label:'搭乘地鐵',className:'metro'},
+   bus:{emoji:'🚌',label:'搭乘公車',className:'bus'},
+   taxi:{emoji:'🚕',label:'搭乘計程車',className:'taxi'},
+   car:{emoji:'🚗',label:'自駕前往',className:'car'},
+   train:{emoji:'🚆',label:'搭乘火車',className:'train'},
+   flight:{emoji:'✈️',label:'搭乘飛機',className:'flight'},
+   ferry:{emoji:'⛴️',label:'搭乘渡輪',className:'ferry'}
+  }
+  return map[mode]
+ }
+ if(next?.type==='meal')return {emoji:'🍴',label:'前往用餐地點',className:'meal'}
+ if(next?.type==='hotel')return {emoji:'🏨',label:'返回住宿',className:'hotel'}
+ return {emoji:'📷',label:'前往下一個景點',className:'place'}
+}
+const connectorTimeText=(current:Item,next?:Item)=>{
+ if(current.type==='transport'&&current.durationMin)return `約 ${current.durationMin} 分鐘`
+ if(next&&current.end&&next.start){
+  const toMinutes=(value:string)=>{
+   const [h,m]=value.split(':').map(Number)
+   return h*60+m
+  }
+  let diff=toMinutes(next.start)-toMinutes(current.end)
+  if(diff<0)diff+=24*60
+  if(diff>0&&diff<=180)return `間隔 ${diff} 分鐘`
+ }
+ return ''
+}
+function ItineraryConnector({current,next}:{current:Item;next?:Item}){
+ if(!next)return null
+ const visual=connectorVisual(current,next)
+ const time=connectorTimeText(current,next)
+ const destination=current.type==='transport'&&(current.to||next.title)
+ return <div className={`itinerary-connector ${visual.className}`}>
+  <div className="connector-line"/>
+  <div className="connector-icon" aria-hidden="true">{visual.emoji}</div>
+  <div className="connector-copy">
+   <b>{visual.label}</b>
+   {destination&&<span>{destination}</span>}
+   {time&&<small>{time}</small>}
+  </div>
+  <div className="connector-line"/>
+ </div>
+}
+
 function TransportDetails({item}:{item:Item}){
  const m=item.transportMode||'metro'
  return <div className="transport-card"><div className="transport-title"><span>{modeEmoji[m]}</span><b>{modeLabel[m]}</b>{item.flightNo&&<strong>{item.flightNo}</strong>}{item.line&&<strong>{item.line}</strong>}</div>{(item.from||item.to)&&<div className="route"><span>{item.from||'出發地'}</span><b>→</b><span>{item.to||'抵達地'}</span></div>}<div className="transport-meta">{item.durationMin!=null&&<span><Clock3 size={15}/>{item.durationMin} 分鐘</span>}{item.distanceKm!=null&&<span><Ruler size={15}/>{item.distanceKm} 公里</span>}</div></div>
@@ -1159,6 +1212,7 @@ function App(){
  const [smartMenu,setSmartMenu]=useState<{dayId:string,item:Item,index:number,total:number}|null>(null)
  const [weatherOpen,setWeatherOpen]=useState(false)
  const [refreshingFlight,setRefreshingFlight]=useState<string|null>(null)
+ const [showConnectors,setShowConnectors]=useState(()=>localStorage.getItem('travel-planner-show-connectors')!=='false')
  const active=s.trips.find(t=>t.id===s.active)||null
  const update=(n:State)=>{setS(n);if(!readOnly)save(n)}
  const updateWallet=(w:WalletData)=>{if(!active)return;const t={...active,wallet:w,updated:Date.now()};update({...s,trips:s.trips.map(x=>x.id===t.id?t:x)})}
@@ -1283,9 +1337,9 @@ function App(){
    <nav className="day-tabs" aria-label="每日行程分頁">{active.days.map((d,i)=><button key={d.id} className={current?.id===d.id?'active':''} onClick={()=>setTab(d.id)}><small>{d.date.slice(5)}</small><b>Day {i+1}</b></button>)}</nav>
    {current&&<section className="card day single-day"><div className="day-head"><div><small>{new Date(current.date+'T12:00:00').toLocaleDateString('zh-TW',{weekday:'long'})}</small><h2>{current.title}・{current.date.slice(5)}</h2></div>{!readOnly&&<button className="icon" onClick={()=>setItemEditor({dayId:current.id})}><Plus/></button>}</div>
     <div className="day-summary"><span>📌 {current.items.length} 個安排</span><span>🚉 {transportCount} 段交通</span><span>⏱ {totalDuration} 分鐘通勤</span></div>
-    <div className="timeline">{current.items.length?current.items.map((i,itemIndex)=><article className={`item ${i.type}`} key={i.id}><div className="time">{i.start}<span>～</span>{i.end}</div><div className="body"><div className="item-head"><div><small>{typeName[i.type].toUpperCase()}</small><h3>{i.title}</h3></div>{!readOnly&&<button className="mini-more" aria-label="更多功能" onClick={()=>setSmartMenu({dayId:current.id,item:i,index:itemIndex,total:current.items.length})}><MoreHorizontal size={18}/></button>}</div>{i.type==='transport'&&<TransportDetails item={i}/>}
+    <div className="timeline">{current.items.length?current.items.map((i,itemIndex)=><React.Fragment key={i.id}><article className={`item ${i.type}`}><div className="time">{i.start}<span>～</span>{i.end}</div><div className="body"><div className="item-head"><div><small>{typeName[i.type].toUpperCase()}</small><h3>{i.title}</h3></div>{!readOnly&&<button className="mini-more" aria-label="更多功能" onClick={()=>setSmartMenu({dayId:current.id,item:i,index:itemIndex,total:current.items.length})}><MoreHorizontal size={18}/></button>}</div>{i.type==='transport'&&<TransportDetails item={i}/>}
 {i.type==='flight'&&<FlightCardDetails item={i} onRefresh={()=>refreshSavedFlight(current.id,i)} refreshing={refreshingFlight===i.id}/>} {(i.type==='place'||i.type==='meal'||i.type==='hotel')?<PlaceCardDetails item={i}/>:<>{i.address&&<p className="item-address"><MapPin size={14}/>{i.address}</p>}{i.openingHours&&<p className="item-hours"><Clock3 size={14}/>{i.openingHours}</p>}{i.rating!=null&&<p className="item-rating"><Star size={14}/> {i.rating}（{i.userRatingCount||0}）{i.openNow===true?'・營業中':i.openNow===false?'・目前休息':''}</p>}</>}{i.note&&i.type!=='note'&&i.note.trim()!==i.address?.trim()&&<p>{i.note}</p>}{i.checks&&<div className="checks"><div className="note-heading"><StickyNote size={17}/>便條待辦</div>{i.checks.map(c=><label key={c.id}><input disabled={readOnly} type="checkbox" checked={c.done} onChange={()=>toggle(current.id,i.id,c.id)}/><span>{c.text}</span></label>)}</div>}
-    </div></article>):<p className="empty">這一天還沒有行程，按右上角＋加入。</p>}</div>
+    </div></article>{showConnectors&&<ItineraryConnector current={i} next={current.items[itemIndex+1]}/>}</React.Fragment>):<p className="empty">這一天還沒有行程，按右上角＋加入。</p>}</div>
     <div className="day-pager"><button className="btn" disabled={idx<=0} onClick={()=>setTab(active.days[idx-1]?.id)}><ChevronLeft size={18}/>前一天</button><span>{idx+1} / {active.days.length}</span><button className="btn" disabled={idx>=active.days.length-1} onClick={()=>setTab(active.days[idx+1]?.id)}>後一天<ChevronRight size={18}/></button></div>
    </section>}
   </>
@@ -1309,7 +1363,10 @@ function App(){
     {page==='explore'&&<ExploreCenter trip={active} onAdd={addToCurrentDay} onFavorite={addFavorite} onRemoveFavorite={removeFavorite}/>}
     {page==='wallet'&&<WalletCenter trip={active} onChange={updateWallet}/>}
     {page==='translate'&&<TranslateCenter trip={active}/>}
-    {page==='more'&&<section className="tools-grid"><button className="card tool-card" onClick={()=>setForm(active)}><Palette/><b>主題風格</b><span>10 種官方主題</span></button><button className="card tool-card" onClick={()=>window.print()}><FileDown/><b>旅行手冊</b><span>列印／PDF</span></button><button className="card tool-card" onClick={()=>setFlightOpen(true)}><Plane/><b>航班中心</b><span>查詢或手動建立航班</span></button><button className="card tool-card" onClick={()=>setTransitOpen(true)}><Compass/><b>交通中心</b><span>建立地鐵、公車與步行路線</span></button><button className="card tool-card" onClick={()=>setWeatherOpen(true)}><CloudSun/><b>天氣中心</b><span>七天天氣與手動更新</span></button></section>}
+    {page==='more'&&<><article className="card connector-setting">
+ <div><small>ITINERARY STYLE</small><h3>行程連接小插畫</h3><p>在每個行程之間顯示飛機、餐盤、地鐵等小插畫。</p></div>
+ <button className={showConnectors?'toggle-switch active':'toggle-switch'} onClick={()=>{const next=!showConnectors;setShowConnectors(next);localStorage.setItem('travel-planner-show-connectors',String(next))}} aria-label="切換行程小插畫"><i/></button>
+</article><section className="tools-grid"><button className="card tool-card" onClick={()=>setForm(active)}><Palette/><b>主題風格</b><span>10 種官方主題</span></button><button className="card tool-card" onClick={()=>window.print()}><FileDown/><b>旅行手冊</b><span>列印／PDF</span></button><button className="card tool-card" onClick={()=>setFlightOpen(true)}><Plane/><b>航班中心</b><span>查詢或手動建立航班</span></button><button className="card tool-card" onClick={()=>setTransitOpen(true)}><Compass/><b>交通中心</b><span>建立地鐵、公車與步行路線</span></button><button className="card tool-card" onClick={()=>setWeatherOpen(true)}><CloudSun/><b>天氣中心</b><span>七天天氣與手動更新</span></button></section></>}
    </main>
    {weatherOpen&&<ModalShell title="天氣中心" onClose={()=>setWeatherOpen(false)}><Weather trip={active}/></ModalShell>}
    {flightOpen&&<ModalShell title="航班中心" onClose={()=>setFlightOpen(false)}><FlightCenter trip={active} onAdd={x=>{addToCurrentDay(x);setFlightOpen(false)}}/></ModalShell>}
