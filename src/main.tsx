@@ -361,6 +361,172 @@ const stations=[
  ['京都','JR','京都','京都','Kyoto'],['京都','阪急京都線','京都河原町','京都河原町','Kyoto-kawaramachi'],['京都','京阪本線','祇園四條','祇園四条','Gion-shijo'],['京都','JR奈良線','稻荷','稲荷','Inari'],['福岡','機場線','福岡機場','福岡空港','Fukuoka Airport'],['福岡','機場線','博多','博多','Hakata'],['福岡','機場線','天神','天神','Tenjin']
 ] as const
 const stationSearch=(q:string)=>{const k=q.trim().toLowerCase();return k?stations.filter(s=>s.join(' ').toLowerCase().includes(k)).slice(0,20):[]}
+
+type MetroStation=typeof stations[number]
+type MetroRouteSegment={line:string;from:string;to:string;stops:number}
+type MetroRouteResult={
+ city:string;from:MetroStation;to:MetroStation;minutes:number;stations:number;
+ transfers:number;fare:number;currency:string;segments:MetroRouteSegment[]
+}
+
+const metroLines:Record<string,Record<string,string[]>>={
+ '釜山':{
+  '1號線':['多大浦海水浴場','下端','札嘎其','南浦','中央','釜山站','草梁','西面','釜田','蓮山','東萊','溫泉場','老圃'],
+  '2號線':['萇山','中洞','海雲台','冬柏','Centum City','民樂','廣安','金蓮山','慶星大釜慶大','田浦','西面','沙上'],
+  '3號線':['美南','社稷','蓮山','巨堤'],
+  '東海線':['釜田','巨堤','新海雲台','松亭','機張'],
+  '金海輕軌':['沙上','金海機場']
+ },
+ '首爾':{
+  '1號線':['首爾站','鐘路三街'],
+  '2號線':['弘大入口','乙支路入口','東大門歷史文化公園','聖水','江南'],
+  '3號線':['景福宮','鐘路三街'],
+  '4號線':['首爾站','明洞','東大門歷史文化公園'],
+  '6號線':['梨泰院'],
+  '機場鐵路':['仁川機場第二航廈','仁川機場第一航廈','弘大入口','首爾站']
+ },
+ '東京':{
+  'JR山手線':['東京','秋葉原','上野','池袋','新宿','澀谷'],
+  '銀座線':['淺草','上野','銀座'],
+  '機場線':['羽田機場第三航廈','東京']
+ },
+ '大阪':{
+  '御堂筋線':['梅田','心齋橋','難波','天王寺'],
+  'JR':['大阪','環球影城'],
+  '南海線':['關西機場','難波']
+ },
+ '京都':{
+  'JR':['京都','稻荷'],
+  '阪急京都線':['京都河原町'],
+  '京阪本線':['祇園四條']
+ },
+ '福岡':{
+  '機場線':['福岡機場','博多','天神']
+ }
+}
+
+const normStation=(v:string)=>v.toLowerCase().replace(/[\s站駅·・\-_()（）]/g,'')
+const stationAliases=(s:MetroStation)=>[s[2],s[3],s[4],`${s[2]}站`,`${s[4]} Station`]
+const findStations=(query:string,city='')=>{
+ const key=normStation(query)
+ if(!key)return [] as MetroStation[]
+ return stations
+  .filter(s=>(!city||s[0]===city)&&stationAliases(s).some(x=>normStation(x).includes(key)))
+  .sort((a,b)=>(a[0]===city?0:1)-(b[0]===city?0:1))
+  .slice(0,12)
+}
+const cityForTrip=(destination:string)=>{
+ const d=destination.toLowerCase()
+ if(/釜山|busan/.test(d))return '釜山'
+ if(/首爾|seoul/.test(d))return '首爾'
+ if(/東京|tokyo/.test(d))return '東京'
+ if(/大阪|osaka/.test(d))return '大阪'
+ if(/京都|kyoto/.test(d))return '京都'
+ if(/福岡|fukuoka/.test(d))return '福岡'
+ return ''
+}
+const addClockMinutes=(time:string,minutes:number)=>{
+ const [h,m]=time.split(':').map(Number)
+ const total=((h||0)*60+(m||0)+minutes)%(24*60)
+ return `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`
+}
+const metroFare=(city:string,stationsCount:number)=>{
+ if(city==='釜山')return {fare:stationsCount<=10?1600:1800,currency:'KRW'}
+ if(city==='首爾')return {fare:stationsCount<=10?1550:1750,currency:'KRW'}
+ if(['東京','大阪','京都','福岡'].includes(city))return {fare:stationsCount<=5?180:stationsCount<=10?240:320,currency:'JPY'}
+ return {fare:0,currency:''}
+}
+const calculateMetroRoute=(from:MetroStation,to:MetroStation):MetroRouteResult|null=>{
+ if(from[0]!==to[0])return null
+ const city=from[0]
+ const lines=metroLines[city]
+ if(!lines)return null
+
+ type State={station:string;line:string}
+ const stateKey=(s:State)=>`${s.line}::${s.station}`
+ const states:State[]=[]
+ Object.entries(lines).forEach(([line,list])=>list.forEach(station=>states.push({station,line})))
+ const adjacency=new Map<string,{state:State;cost:number}[]>()
+ const add=(a:State,b:State,cost:number)=>{
+  const k=stateKey(a)
+  if(!adjacency.has(k))adjacency.set(k,[])
+  adjacency.get(k)!.push({state:b,cost})
+ }
+ Object.entries(lines).forEach(([line,list])=>{
+  list.forEach((station,i)=>{
+   if(i<list.length-1){
+    const a={station,line},b={station:list[i+1],line}
+    add(a,b,3);add(b,a,3)
+   }
+  })
+ })
+ const byStation=new Map<string,State[]>()
+ states.forEach(s=>byStation.set(s.station,[...(byStation.get(s.station)||[]),s]))
+ byStation.forEach(group=>{
+  group.forEach(a=>group.forEach(b=>{if(a.line!==b.line)add(a,b,6)}))
+ })
+
+ const starts=states.filter(s=>s.station===from[2])
+ const targets=new Set(states.filter(s=>s.station===to[2]).map(stateKey))
+ if(!starts.length||!targets.size)return null
+
+ const dist=new Map<string,number>(),prev=new Map<string,string>()
+ const queue:{state:State;distance:number}[]=starts.map(s=>({state:s,distance:0}))
+ starts.forEach(s=>dist.set(stateKey(s),0))
+
+ while(queue.length){
+  queue.sort((a,b)=>a.distance-b.distance)
+  const current=queue.shift()!,ck=stateKey(current.state)
+  if(current.distance!==dist.get(ck))continue
+  if(targets.has(ck)){
+   const path:State[]=[current.state]
+   let cursor=ck
+   while(prev.has(cursor)){
+    cursor=prev.get(cursor)!
+    const sep=cursor.indexOf('::')
+    path.unshift({line:cursor.slice(0,sep),station:cursor.slice(sep+2)})
+   }
+
+   const segments:MetroRouteSegment[]=[]
+   let activeLine=path[0].line
+   let segmentStart=path[0].station
+   let stops=0
+   let totalStations=0
+
+   for(let i=1;i<path.length;i++){
+    const previous=path[i-1],next=path[i]
+    if(next.line!==activeLine){
+     if(stops>0)segments.push({line:activeLine,from:segmentStart,to:previous.station,stops})
+     activeLine=next.line
+     segmentStart=next.station
+     stops=0
+    }else if(next.station!==previous.station){
+     stops++
+     totalStations++
+    }
+   }
+   if(stops>0||segments.length===0){
+    segments.push({line:activeLine,from:segmentStart,to:path[path.length-1].station,stops})
+   }
+
+   const transfers=Math.max(0,segments.length-1)
+   const minutes=Math.max(4,current.distance+4)
+   const fareInfo=metroFare(city,totalStations)
+   return {city,from,to,minutes,stations:totalStations,transfers,segments,...fareInfo}
+  }
+
+  for(const edge of adjacency.get(ck)||[]){
+   const nk=stateKey(edge.state),nd=current.distance+edge.cost
+   if(nd<(dist.get(nk)??Infinity)){
+    dist.set(nk,nd)
+    prev.set(nk,ck)
+    queue.push({state:edge.state,distance:nd})
+   }
+  }
+ }
+ return null
+}
+
 const gmap=(q:string)=>`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`
 const nmap=(q:string)=>`https://map.naver.com/p/search/${encodeURIComponent(q)}`
 const ftime=(s?:string)=>s?new Date(s).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'—'
@@ -558,9 +724,46 @@ function ExploreCenter({trip,onAdd,onFavorite,onRemoveFavorite}:{trip:Trip,onAdd
  const [loading,setLoading]=useState(false)
  const [places,setPlaces]=useState<PlaceResult[]>([])
  const [msg,setMsg]=useState('')
- const [sq,setSq]=useState('')
+ const metroCity=cityForTrip(trip.destination)
+ const [metroFromQuery,setMetroFromQuery]=useState('')
+ const [metroToQuery,setMetroToQuery]=useState('')
+ const [metroFrom,setMetroFrom]=useState<MetroStation|null>(null)
+ const [metroTo,setMetroTo]=useState<MetroStation|null>(null)
+ const [metroStart,setMetroStart]=useState('09:00')
+ const [metroRoute,setMetroRoute]=useState<MetroRouteResult|null>(null)
+ const [metroMessage,setMetroMessage]=useState('')
  const [view,setView]=useState<'search'|'favorites'>('search')
- const ss=useMemo(()=>stationSearch(sq),[sq])
+ const fromSuggestions=useMemo(()=>findStations(metroFromQuery,metroCity),[metroFromQuery,metroCity])
+ const toSuggestions=useMemo(()=>findStations(metroToQuery,metroCity),[metroToQuery,metroCity])
+ const chooseMetroStation=(side:'from'|'to',station:MetroStation)=>{
+  if(side==='from'){setMetroFrom(station);setMetroFromQuery(`${station[2]}｜${station[3]}`)}
+  else{setMetroTo(station);setMetroToQuery(`${station[2]}｜${station[3]}`)}
+  setMetroRoute(null);setMetroMessage('')
+ }
+ const swapMetro=()=>{
+  const from=metroFrom,fromQ=metroFromQuery
+  setMetroFrom(metroTo);setMetroFromQuery(metroToQuery)
+  setMetroTo(from);setMetroToQuery(fromQ)
+  setMetroRoute(null);setMetroMessage('')
+ }
+ const searchMetroRoute=()=>{
+  if(!metroFrom||!metroTo){setMetroMessage('請先從搜尋結果選擇起點與終點站。');return}
+  if(metroFrom[2]===metroTo[2]){setMetroMessage('起點與終點不能是同一站。');return}
+  const route=calculateMetroRoute(metroFrom,metroTo)
+  if(!route){setMetroRoute(null);setMetroMessage('目前資料無法計算這兩站的路線，請確認兩站位於同一城市。');return}
+  setMetroRoute(route);setMetroMessage('')
+ }
+ const addMetroRoute=()=>{
+  if(!metroRoute)return
+  const routeLines=metroRoute.segments.map(s=>s.line).join(' → ')
+  onAdd({id:id(),type:'transport',start:metroStart,end:addClockMinutes(metroStart,metroRoute.minutes),
+   title:`${metroRoute.from[2]} → ${metroRoute.to[2]}`,transportMode:'metro',
+   from:`${metroRoute.from[2]} ${metroRoute.from[3]} ${metroRoute.from[4]}`,
+   to:`${metroRoute.to[2]} ${metroRoute.to[3]} ${metroRoute.to[4]}`,
+   line:routeLines,durationMin:metroRoute.minutes,
+   note:`共 ${metroRoute.stations} 站・轉乘 ${metroRoute.transfers} 次${metroRoute.fare?`・約 ${metroRoute.fare.toLocaleString()} ${metroRoute.currency}`:''}`})
+  setMetroMessage('已加入目前 Day。')
+ }
  const favorites=trip.favorites||[]
  const isFavorite=(placeId:string)=>favorites.some(f=>f.placeSource===placeId||f.id===placeId)
  const resultToItem=(p:PlaceResult):Item=>({
@@ -629,10 +832,61 @@ function ExploreCenter({trip,onAdd,onFavorite,onRemoveFavorite}:{trip:Trip,onAdd
     </article>
    })}</div>
 
-   <div className="card feature-card">
-    <div className="feature-head"><div><small>TRANSIT STATION</small><h2>地鐵站搜尋</h2></div><span className="bigemoji">🚇</span></div>
-    <input value={sq} onChange={e=>setSq(e.target.value)} placeholder="例如：海雲台、西面、梅田、難波"/>
-    <div className="station-list">{ss.map(s=><button key={s.join('-')} onClick={()=>onAdd({id:id(),type:'transport',start:'09:00',end:'09:30',title:`前往${s[2]}站`,transportMode:'metro',to:`${s[2]} ${s[3]} ${s[4]}`,line:`${s[0]} ${s[1]}`})}><span><b>{s[2]}</b><small>{s[3]}・{s[4]}</small></span><em>{s[0]}・{s[1]}</em><Plus size={17}/></button>)}</div>
+   <div className="card feature-card metro-planner">
+    <div className="feature-head"><div><small>METRO PLANNER</small><h2>地鐵雙向導航</h2><p>{metroCity||trip.destination}・中文／當地語言／英文皆可搜尋</p></div><span className="bigemoji">🚇</span></div>
+
+    <div className="metro-route-inputs">
+     <div className="metro-point">
+      <span className="metro-dot start">起</span>
+      <div className="metro-search-box">
+       <label>起點站</label>
+       <input value={metroFromQuery} onChange={e=>{setMetroFromQuery(e.target.value);setMetroFrom(null);setMetroRoute(null)}} placeholder="例如：西面、서면、Seomyeon"/>
+       {metroFromQuery&&!metroFrom&&fromSuggestions.length>0&&<div className="metro-suggestions">{fromSuggestions.map(s=><button type="button" key={`from-${s.join('-')}`} onClick={()=>chooseMetroStation('from',s)}><span><b>{s[2]}</b><small>{s[3]}・{s[4]}</small></span><em>{s[1]}</em></button>)}</div>}
+      </div>
+     </div>
+
+     <button className="metro-swap" type="button" onClick={swapMetro} aria-label="交換起點與終點">⇅</button>
+
+     <div className="metro-point">
+      <span className="metro-dot end">迄</span>
+      <div className="metro-search-box">
+       <label>終點站</label>
+       <input value={metroToQuery} onChange={e=>{setMetroToQuery(e.target.value);setMetroTo(null);setMetroRoute(null)}} placeholder="例如：海雲台、해운대、Haeundae"/>
+       {metroToQuery&&!metroTo&&toSuggestions.length>0&&<div className="metro-suggestions">{toSuggestions.map(s=><button type="button" key={`to-${s.join('-')}`} onClick={()=>chooseMetroStation('to',s)}><span><b>{s[2]}</b><small>{s[3]}・{s[4]}</small></span><em>{s[1]}</em></button>)}</div>}
+      </div>
+     </div>
+    </div>
+
+    <div className="metro-plan-actions">
+     <label>預計出發時間<input type="time" value={metroStart} onChange={e=>setMetroStart(e.target.value)}/></label>
+     <button className="btn primary" type="button" onClick={searchMetroRoute}><Search size={17}/>計算路線</button>
+    </div>
+    {metroMessage&&<p className="service-message">{metroMessage}</p>}
+
+    {metroRoute&&<article className="metro-route-result">
+     <header>
+      <div><small>ROUTE RESULT</small><h3>{metroRoute.from[2]} → {metroRoute.to[2]}</h3></div>
+      <strong>{metroRoute.minutes} 分鐘</strong>
+     </header>
+     <div className="metro-summary">
+      <span><b>{metroRoute.stations}</b>站</span>
+      <span><b>{metroRoute.transfers}</b>次轉乘</span>
+      <span><b>{metroStart}</b>出發</span>
+      <span><b>{addClockMinutes(metroStart,metroRoute.minutes)}</b>抵達</span>
+      {metroRoute.fare>0&&<span><b>{metroRoute.fare.toLocaleString()}</b>{metroRoute.currency}</span>}
+     </div>
+     <div className="metro-segments">{metroRoute.segments.map((segment,index)=><div className="metro-segment" key={`${segment.line}-${index}`}>
+      <span className="metro-line-badge">{segment.line}</span>
+      <div><b>{segment.from}</b><i>↓ 搭乘 {segment.stops} 站</i><b>{segment.to}</b></div>
+      {index<metroRoute.segments.length-1&&<em>轉乘</em>}
+     </div>)}</div>
+     <p className="metro-estimate-note">時間與票價為行程規劃估算，實際班距、轉乘步行及票價請以當地交通資訊為準。</p>
+     <div className="metro-result-actions">
+      <a className="btn" target="_blank" rel="noreferrer" href={gmap(`${metroRoute.from[4]} Station to ${metroRoute.to[4]} Station transit`)}>Google Maps</a>
+      {metroRoute.city==='釜山'&&<a className="btn" target="_blank" rel="noreferrer" href={nmap(`${metroRoute.from[3]} ${metroRoute.to[3]} 지하철`)}>Naver Map</a>}
+      <button className="btn yellow" type="button" onClick={addMetroRoute}><Plus size={17}/>加入目前 Day</button>
+     </div>
+    </article>}
    </div>
   </>}
 

@@ -1671,3 +1671,51 @@ form select{
     font-size:19px!important;
   }
 }
+
+/* =========================================================
+   v3.0.0 — Metro Planner
+   ========================================================= */
+.metro-planner .feature-head p{margin:4px 0 0;font-size:11px;color:#66716e}
+.metro-route-inputs{position:relative;display:grid;gap:10px;margin-top:15px}
+.metro-point{display:grid;grid-template-columns:34px minmax(0,1fr);gap:9px;align-items:start}
+.metro-dot{display:flex;align-items:center;justify-content:center;width:32px;height:32px;margin-top:24px;border:2px solid var(--ink);border-radius:50%;font-size:11px;font-weight:900;background:var(--paper);box-shadow:2px 2px 0 var(--ink)}
+.metro-dot.start{background:color-mix(in srgb,var(--secondary) 55%,white)}
+.metro-dot.end{background:color-mix(in srgb,var(--accent) 35%,white)}
+.metro-search-box{position:relative;min-width:0}
+.metro-search-box label{display:grid;gap:5px;font-size:11px;font-weight:900}
+.metro-search-box input{padding-right:12px}
+.metro-suggestions{position:absolute;top:100%;left:0;right:0;z-index:20;max-height:230px;overflow:auto;margin-top:5px;padding:5px;border:2px solid var(--ink);border-radius:9px;background:var(--paper);box-shadow:4px 4px 0 var(--ink)}
+.metro-suggestions button{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;width:100%;padding:9px;border:0;border-bottom:1px dashed color-mix(in srgb,var(--ink) 45%,transparent);background:transparent;text-align:left}
+.metro-suggestions button:last-child{border-bottom:0}
+.metro-suggestions button span{display:grid;min-width:0}
+.metro-suggestions button small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#6e7875}
+.metro-suggestions button em{align-self:center;padding:4px 6px;border-radius:999px;background:var(--soft);font-size:10px;font-style:normal}
+.metro-swap{position:absolute;right:8px;top:77px;z-index:4;display:flex;align-items:center;justify-content:center;width:34px;height:34px;border:2px solid var(--ink);border-radius:50%;background:var(--primary);box-shadow:2px 2px 0 var(--ink);font-size:20px;font-weight:900}
+.metro-plan-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end;margin-top:14px}
+.metro-plan-actions label{display:grid;gap:5px;font-size:11px;font-weight:900}
+.metro-plan-actions input{box-shadow:none!important}
+.metro-route-result{margin-top:15px;padding:14px;border:2px solid var(--ink);border-radius:10px;background:color-mix(in srgb,var(--soft) 58%,white);box-shadow:4px 4px 0 var(--ink)}
+.metro-route-result>header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.metro-route-result header small{font-size:9px}
+.metro-route-result header h3{margin:2px 0}
+.metro-route-result header>strong{padding:7px 9px;border:2px solid var(--ink);border-radius:999px;background:var(--paper);white-space:nowrap}
+.metro-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px;margin:12px 0}
+.metro-summary span{display:grid;justify-items:center;padding:7px 2px;border:1px solid var(--ink);border-radius:7px;background:var(--paper);font-size:8px}
+.metro-summary b{font-size:13px}
+.metro-segments{display:grid;gap:0;padding:11px;border:1.5px dashed var(--ink);border-radius:9px;background:var(--paper)}
+.metro-segment{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:9px;align-items:center}
+.metro-segment>div{display:grid;gap:4px;padding:7px 0}
+.metro-segment i{font-size:10px;font-style:normal;color:#687270}
+.metro-segment>em{padding:4px 6px;border-radius:999px;background:var(--primary);font-size:9px;font-style:normal;font-weight:900}
+.metro-line-badge{min-width:48px;padding:6px;border:2px solid var(--ink);border-radius:7px;background:var(--secondary);text-align:center;font-size:10px;font-weight:900}
+.metro-estimate-note{margin:10px 0 0;font-size:9px;color:#687270}
+.metro-result-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.metro-result-actions .btn{text-decoration:none}
+@media(max-width:520px){
+ .metro-plan-actions{grid-template-columns:1fr}
+ .metro-plan-actions .btn{width:100%}
+ .metro-summary{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .metro-segment{grid-template-columns:auto minmax(0,1fr)}
+ .metro-segment>em{grid-column:2}
+ .metro-result-actions>*{flex:1;justify-content:center}
+}
