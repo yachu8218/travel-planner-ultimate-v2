@@ -1,5 +1,5 @@
 {
-  "name": "旅行手帳 Travel Planner Ultimate 3.0.1",
+  "name": "旅行手帳 Travel Planner Ultimate 3.0.2",
   "short_name": "旅行手帳",
   "start_url": "/",
   "display": "standalone",
@@ -20,5 +20,5 @@
       "purpose": "any maskable"
     }
   ],
-  "description": "首爾地鐵資料擴充、時間估算改善、7 天天氣與航班卡去重"
+  "description": "航班便條與待辦一鍵收合，並保留每張航班卡的收合狀態"
 }

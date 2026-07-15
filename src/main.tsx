@@ -1466,6 +1466,16 @@ function App(){
  const [transitOpen,setTransitOpen]=useState(false)
  const [smartMenu,setSmartMenu]=useState<{dayId:string,item:Item,index:number,total:number}|null>(null)
  const [weatherOpen,setWeatherOpen]=useState(false)
+ const [flightNotesCollapsed,setFlightNotesCollapsed]=useState<Record<string,boolean>>(()=>{
+  try{return JSON.parse(localStorage.getItem('travel-flight-notes-collapsed')||'{}')}catch{return {}}
+ })
+ const toggleFlightNotes=(itemId:string)=>{
+  setFlightNotesCollapsed(current=>{
+   const next={...current,[itemId]:!current[itemId]}
+   localStorage.setItem('travel-flight-notes-collapsed',JSON.stringify(next))
+   return next
+  })
+ }
  const [refreshingFlight,setRefreshingFlight]=useState<string|null>(null)
  const [showConnectors,setShowConnectors]=useState(()=>localStorage.getItem('travel-planner-show-connectors')!=='false')
  const active=s.trips.find(t=>t.id===s.active)||null
@@ -1593,7 +1603,16 @@ function App(){
    {current&&<section className="card day single-day"><div className="day-head"><div><small>{new Date(current.date+'T12:00:00').toLocaleDateString('zh-TW',{weekday:'long'})}</small><h2>{current.title}・{current.date.slice(5)}</h2></div>{!readOnly&&<button className="icon" onClick={()=>setItemEditor({dayId:current.id})}><Plus/></button>}</div>
     <div className="day-summary"><span>📌 {current.items.length} 個安排</span><span>🚉 {transportCount} 段交通</span><span>⏱ {totalDuration} 分鐘通勤</span></div>
     <div className="timeline">{current.items.length?current.items.map((i,itemIndex)=><React.Fragment key={i.id}><article className={`item ${i.type}`}><div className="time">{i.start}<span>～</span>{i.end}</div><div className="body"><div className="item-head"><div><small>{typeName[i.type].toUpperCase()}</small><h3>{i.title}</h3></div>{!readOnly&&<button className="mini-more" aria-label="更多功能" onClick={()=>setSmartMenu({dayId:current.id,item:i,index:itemIndex,total:current.items.length})}><MoreHorizontal size={18}/></button>}</div>{i.type==='transport'&&<TransportDetails item={i}/>}
-{i.type==='flight'&&<FlightCardDetails item={i} onRefresh={()=>refreshSavedFlight(current.id,i)} refreshing={refreshingFlight===i.id}/>} {(i.type==='place'||i.type==='meal'||i.type==='hotel')?<PlaceCardDetails item={i}/>:<>{i.address&&<p className="item-address"><MapPin size={14}/>{i.address}</p>}{i.openingHours&&<p className="item-hours"><Clock3 size={14}/>{i.openingHours}</p>}{i.rating!=null&&<p className="item-rating"><Star size={14}/> {i.rating}（{i.userRatingCount||0}）{i.openNow===true?'・營業中':i.openNow===false?'・目前休息':''}</p>}</>}{i.note&&i.type!=='note'&&i.note.trim()!==i.address?.trim()&&<p>{i.note}</p>}{i.checks&&<div className="checks"><div className="note-heading"><StickyNote size={17}/>便條待辦</div>{i.checks.map(c=><label key={c.id}><input disabled={readOnly} type="checkbox" checked={c.done} onChange={()=>toggle(current.id,i.id,c.id)}/><span>{c.text}</span></label>)}</div>}
+{i.type==='flight'&&<FlightCardDetails item={i} onRefresh={()=>refreshSavedFlight(current.id,i)} refreshing={refreshingFlight===i.id}/>} {(i.type==='place'||i.type==='meal'||i.type==='hotel')?<PlaceCardDetails item={i}/>:<>{i.address&&<p className="item-address"><MapPin size={14}/>{i.address}</p>}{i.openingHours&&<p className="item-hours"><Clock3 size={14}/>{i.openingHours}</p>}{i.rating!=null&&<p className="item-rating"><Star size={14}/> {i.rating}（{i.userRatingCount||0}）{i.openNow===true?'・營業中':i.openNow===false?'・目前休息':''}</p>}</>}{i.type==='flight'?(i.note||i.checks?.length)?<section className={`flight-notes-panel ${flightNotesCollapsed[i.id]?'collapsed':''}`}>
+     <button type="button" className="flight-notes-toggle" onClick={()=>toggleFlightNotes(i.id)} aria-expanded={!flightNotesCollapsed[i.id]}>
+      <span><StickyNote size={17}/><b>航班便條與待辦</b>{i.checks?.length?<em>{i.checks.filter(c=>!c.done).length} 項未完成</em>:i.note?<em>有便條</em>:null}</span>
+      <span className="flight-collapse-icon">{flightNotesCollapsed[i.id]?'⌄':'⌃'}</span>
+     </button>
+     {!flightNotesCollapsed[i.id]&&<div className="flight-notes-content">
+      {i.note&&i.note.trim()!==i.address?.trim()&&<p className="flight-note-text">{i.note}</p>}
+      {i.checks&&i.checks.length>0&&<div className="checks flight-check-list">{i.checks.map(c=><label key={c.id}><input disabled={readOnly} type="checkbox" checked={c.done} onChange={()=>toggle(current.id,i.id,c.id)}/><span>{c.text}</span></label>)}</div>}
+     </div>}
+    </section>:null:<>{i.note&&i.type!=='note'&&i.note.trim()!==i.address?.trim()&&<p>{i.note}</p>}{i.checks&&i.checks.length>0&&<div className="checks"><div className="note-heading"><StickyNote size={17}/>便條待辦</div>{i.checks.map(c=><label key={c.id}><input disabled={readOnly} type="checkbox" checked={c.done} onChange={()=>toggle(current.id,i.id,c.id)}/><span>{c.text}</span></label>)}</div>}</>}
     </div>{showConnectors&&<ItineraryConnector current={i} next={current.items[itemIndex+1]}/>}</article></React.Fragment>):<p className="empty">這一天還沒有行程，按右上角＋加入。</p>}</div>
     <div className="day-pager"><button className="btn" disabled={idx<=0} onClick={()=>setTab(active.days[idx-1]?.id)}><ChevronLeft size={18}/>前一天</button><span>{idx+1} / {active.days.length}</span><button className="btn" disabled={idx>=active.days.length-1} onClick={()=>setTab(active.days[idx+1]?.id)}>後一天<ChevronRight size={18}/></button></div>
    </section>}
@@ -1635,7 +1654,7 @@ function App(){
   </div>
  }
 
- return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.0.1</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
+ return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.0.2</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
  {s.trips.length?<div className="grid">{s.trips.map(t=><article className={`trip-card theme-${t.theme}`} key={t.id}><button className="trip-cover" style={t.cover?{backgroundImage:`url(${t.cover})`}:{}} onClick={()=>{update({...s,active:t.id});setTab(t.days[0]?.id||null);setPage('home')}}><div><small>{t.country}</small><b>{t.destination}</b><span>{t.start} ～ {t.end}</span></div></button><div className="trip-info"><div><h3>{t.name}</h3><p>{t.currency}・{t.language}</p><small className="theme-name">{themes.find(x=>x.id===t.theme)?.name}</small></div><div className="icons"><button onClick={()=>setForm(t)}><Pencil size={17}/></button><button onClick={()=>duplicate(t)}><Copy size={17}/></button><button onClick={()=>remove(t)}><Trash2 size={17}/></button></div></div></article>)}</div>:<section className="card empty-home"><div>🧳</div><h2>建立第一本旅行手帳</h2><p>釜山、日本、泰國或任何目的地，都能建立獨立行程。</p><button className="btn primary" onClick={()=>setForm(true)}><Plus/>新增旅行</button><button className="btn" onClick={legacy}><Upload size={17}/>匯入舊版</button></section>}</main>
  {form&&<Form trip={form===true?undefined:form} onSave={saveTrip} onClose={()=>setForm(null)}/>}
  </div>
