@@ -1152,33 +1152,11 @@ const connectorVisual=(current:Item,next?:Item)=>{
  if(next?.type==='hotel')return {emoji:'🏨',label:'返回住宿',className:'hotel'}
  return {emoji:'📷',label:'前往下一個景點',className:'place'}
 }
-const connectorTimeText=(current:Item,next?:Item)=>{
- if(current.type==='transport'&&current.durationMin)return `約 ${current.durationMin} 分鐘`
- if(next&&current.end&&next.start){
-  const toMinutes=(value:string)=>{
-   const [h,m]=value.split(':').map(Number)
-   return h*60+m
-  }
-  let diff=toMinutes(next.start)-toMinutes(current.end)
-  if(diff<0)diff+=24*60
-  if(diff>0&&diff<=180)return `間隔 ${diff} 分鐘`
- }
- return ''
-}
 function ItineraryConnector({current,next}:{current:Item;next?:Item}){
  if(!next)return null
  const visual=connectorVisual(current,next)
- const time=connectorTimeText(current,next)
- const destination=current.type==='transport'&&(current.to||next.title)
- return <div className={`itinerary-connector ${visual.className}`}>
-  <div className="connector-line"/>
-  <div className="connector-icon" aria-hidden="true">{visual.emoji}</div>
-  <div className="connector-copy">
-   <b>{visual.label}</b>
-   {destination&&<span>{destination}</span>}
-   {time&&<small>{time}</small>}
-  </div>
-  <div className="connector-line"/>
+ return <div className={`itinerary-connector ${visual.className}`} aria-label={visual.label}>
+  <span className="connector-icon" aria-hidden="true">{visual.emoji}</span>
  </div>
 }
 

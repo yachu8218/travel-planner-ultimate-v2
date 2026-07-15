@@ -1,5 +1,5 @@
 {
-  "name": "旅行手帳 Travel Planner Ultimate 2.9.0",
+  "name": "旅行手帳 Travel Planner Ultimate 2.9.1",
   "short_name": "旅行手帳",
   "start_url": "/",
   "display": "standalone",
@@ -20,5 +20,5 @@
       "purpose": "any maskable"
     }
   ],
-  "description": "行程連接小插畫與移動資訊視覺化"
+  "description": "左側時間軸小插畫位置與置中修正版"
 }

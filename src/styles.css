@@ -1129,3 +1129,55 @@ form select{
   .connector-copy{min-width:64px;max-width:120px}
   .connector-copy span,.connector-copy small{max-width:118px}
 }
+
+/* =========================================================
+   v2.9.1 — 左側時間軸小插畫優化
+   ========================================================= */
+.itinerary-connector{
+  grid-column:1!important;
+  position:relative;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:100%;
+  min-height:46px!important;
+  margin:0!important;
+  padding:0!important;
+  z-index:8;
+  pointer-events:none;
+  overflow:visible!important;
+}
+.itinerary-connector .connector-line,
+.itinerary-connector .connector-copy{display:none!important}
+.itinerary-connector .connector-icon{
+  position:relative;display:grid!important;place-items:center!important;
+  width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;
+  margin:0 auto!important;padding:0!important;border:1.5px solid var(--ink)!important;
+  border-radius:50%!important;background:var(--paper);
+  box-shadow:2px 2px 0 color-mix(in srgb,var(--ink) 72%,transparent);
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;
+  font-size:20px!important;line-height:1!important;text-align:center!important;
+  transform:none!important;overflow:hidden;letter-spacing:0;text-indent:0;
+}
+.itinerary-connector.flight .connector-icon{background:#e2edf5}
+.itinerary-connector.meal .connector-icon{background:#f5e3d4}
+.itinerary-connector.hotel .connector-icon{background:#e9e1f3}
+.itinerary-connector.metro .connector-icon,.itinerary-connector.train .connector-icon{background:#dce9df}
+.itinerary-connector.bus .connector-icon,.itinerary-connector.taxi .connector-icon,.itinerary-connector.car .connector-icon{background:#f2e4bc}
+.itinerary-connector.walk .connector-icon{background:#e9eee8}
+.itinerary-connector.place .connector-icon{background:#e9dfd4}
+.itinerary-connector.ferry .connector-icon{background:#dceaf1}
+.timeline,.timeline>*,.item,.item .body{overflow:visible!important}
+.timeline{row-gap:10px!important}
+.item{margin-bottom:0!important}
+.itinerary-connector::before,.itinerary-connector::after{
+  content:"";position:absolute;left:50%;width:1px;
+  border-left:1px dashed color-mix(in srgb,var(--primary) 72%,var(--ink));
+  transform:translateX(-50%);z-index:-1;
+}
+.itinerary-connector::before{top:-14px;height:14px}
+.itinerary-connector::after{bottom:-14px;height:14px}
+@media(max-width:420px){
+  .itinerary-connector{min-height:42px!important}
+  .itinerary-connector .connector-icon{width:35px!important;height:35px!important;min-width:35px!important;min-height:35px!important;font-size:18px!important}
+}
