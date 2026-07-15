@@ -1,19 +1,27 @@
-# Travel Planner Ultimate v3.1.2
+# Travel Planner Ultimate v3.1.1
 
-本版專門修正 Cloudflare Pages 的 npm 建置問題。
+## Cloudflare Pages 建置穩定版
 
-## GitHub 請確認
-- package-lock.json 已上傳
-- package.json 已覆蓋
-- .npmrc 已上傳
-- .node-version 已上傳
-- 沒有 pnpm-lock.yaml
+本版專門修正：
 
-## Cloudflare
-Build command：npm run build
-Build output directory：dist
-NODE_VERSION：20.19.4
+```text
+npm error Exit handler never called!
+tsc: not found
+```
 
-若 Cloudflare 平台仍出現 `Exit handler never called!`，可改用：
-SKIP_DEPENDENCY_INSTALL=1
-Build command：npm install --no-audit --no-fund --progress=false && npm run build
+專案已改用 `pnpm 9.15.9`，並移除 `package-lock.json`。
+
+### 上傳 GitHub 時請確認
+
+- `pnpm-lock.yaml` 有上傳
+- `package.json` 有覆蓋
+- `package-lock.json` 已從 GitHub 刪除
+
+### Cloudflare Build 設定
+
+```text
+Build command: pnpm run build
+Build output directory: dist
+```
+
+已設定的 `NODE_VERSION=20.19.4` 可以保留。
