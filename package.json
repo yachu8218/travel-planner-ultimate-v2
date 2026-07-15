@@ -1,7 +1,7 @@
 {
   "name": "travel-planner-ultimate-v2",
   "private": true,
-  "version": "2.9.3",
+  "version": "2.9.4",
   "type": "module",
   "scripts": {
     "dev": "vite",

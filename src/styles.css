@@ -1487,3 +1487,187 @@ form select{
   .home-theme-weather .weather-day span{font-size:9px!important}
   .home-theme-weather .weather-day em{font-size:7px!important}
 }
+
+/* =========================================================
+   v2.9.4 — Timeline structure fix
+   Connector no longer creates an empty row beside cards
+   ========================================================= */
+
+.timeline{
+  --timeline-column:86px;
+  --timeline-gap:12px;
+  --time-box-height:66px;
+  --item-gap:18px;
+  position:relative;
+  display:block!important;
+  overflow:visible!important;
+}
+
+/* 主時間軸固定在左欄中心 */
+.timeline::before{
+  content:"";
+  position:absolute;
+  top:0;
+  bottom:0;
+  left:calc(var(--timeline-column) / 2);
+  width:1.5px;
+  background:color-mix(in srgb,var(--ink) 78%,transparent);
+  transform:translateX(-50%);
+  z-index:0;
+  pointer-events:none;
+}
+
+/* 每一個行程本身就是完整的左右兩欄，不再使用 display: contents */
+.timeline>.item{
+  position:relative!important;
+  display:grid!important;
+  grid-template-columns:var(--timeline-column) minmax(0,1fr)!important;
+  column-gap:var(--timeline-gap)!important;
+  align-items:start!important;
+  width:100%;
+  margin:0 0 var(--item-gap)!important;
+  overflow:visible!important;
+}
+
+/* 左側時間框 */
+.timeline>.item>.time{
+  grid-column:1!important;
+  position:relative!important;
+  z-index:3!important;
+  align-self:start!important;
+  width:100%!important;
+  min-height:var(--time-box-height)!important;
+  box-sizing:border-box!important;
+  margin:0!important;
+  background:var(--soft)!important;
+}
+
+/* 右側行程卡完全不受小插畫影響 */
+.timeline>.item>.body{
+  grid-column:2!important;
+  position:relative!important;
+  z-index:2!important;
+  min-width:0!important;
+  width:100%!important;
+  margin:0!important;
+  overflow:visible!important;
+}
+
+/*
+  小插畫附著於目前 item，但不參與排版。
+  計算方式：
+  article 高度的一半 +（時間框高度 + item 間距）的一半，
+  即為目前時間框底部與下一個時間框頂部之間的中點。
+*/
+.timeline>.item>.itinerary-connector{
+  position:absolute!important;
+  left:calc(var(--timeline-column) / 2)!important;
+  top:calc(50% + (var(--time-box-height) + var(--item-gap)) / 2)!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:42px!important;
+  height:42px!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  transform:translate(-50%,-50%)!important;
+  z-index:6!important;
+  pointer-events:none!important;
+  overflow:visible!important;
+}
+
+/* 取消舊版 Connector 自身的線段與文字 */
+.timeline>.item>.itinerary-connector::before,
+.timeline>.item>.itinerary-connector::after,
+.timeline>.item>.itinerary-connector .connector-line,
+.timeline>.item>.itinerary-connector .connector-copy{
+  display:none!important;
+}
+
+/* 圖示圓圈與 Timeline 共用相同中心點 */
+.timeline>.item>.itinerary-connector .connector-icon{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:42px!important;
+  height:42px!important;
+  min-width:42px!important;
+  min-height:42px!important;
+  margin:0!important;
+  padding:0 0 1px!important;
+  box-sizing:border-box!important;
+  border:1.5px solid currentColor!important;
+  border-radius:50%!important;
+  background:var(--paper);
+  box-shadow:2px 2px 0 color-mix(in srgb,var(--ink) 58%,transparent);
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif!important;
+  font-size:21px!important;
+  font-style:normal!important;
+  font-weight:400!important;
+  line-height:1!important;
+  text-align:center!important;
+  text-indent:0!important;
+  letter-spacing:0!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  transform:none!important;
+}
+
+/* 不再允許任何舊版 direct-child Connector 佔據空白列 */
+.timeline>.itinerary-connector{
+  display:none!important;
+}
+
+/* 最後一張行程不需要額外底部空間 */
+.timeline>.item:last-child{
+  margin-bottom:6px!important;
+}
+
+/* 類型配色 */
+.timeline>.item>.itinerary-connector.flight{color:#5eaccf}
+.timeline>.item>.itinerary-connector.flight .connector-icon{background:#e6f2f7}
+.timeline>.item>.itinerary-connector.meal{color:#e27b34}
+.timeline>.item>.itinerary-connector.meal .connector-icon{background:#faeee4}
+.timeline>.item>.itinerary-connector.hotel{color:#8d72b5}
+.timeline>.item>.itinerary-connector.hotel .connector-icon{background:#eee8f5}
+.timeline>.item>.itinerary-connector.metro,
+.timeline>.item>.itinerary-connector.train{color:#4d8a65}
+.timeline>.item>.itinerary-connector.metro .connector-icon,
+.timeline>.item>.itinerary-connector.train .connector-icon{background:#e4f0e8}
+.timeline>.item>.itinerary-connector.bus,
+.timeline>.item>.itinerary-connector.taxi,
+.timeline>.item>.itinerary-connector.car{color:#d75849}
+.timeline>.item>.itinerary-connector.bus .connector-icon,
+.timeline>.item>.itinerary-connector.taxi .connector-icon,
+.timeline>.item>.itinerary-connector.car .connector-icon{background:#fae9df}
+.timeline>.item>.itinerary-connector.walk{color:#6b7c72}
+.timeline>.item>.itinerary-connector.walk .connector-icon{background:#edf1ee}
+.timeline>.item>.itinerary-connector.place{color:#668d58}
+.timeline>.item>.itinerary-connector.place .connector-icon{background:#eaf1e7}
+.timeline>.item>.itinerary-connector.ferry{color:#5489a5}
+.timeline>.item>.itinerary-connector.ferry .connector-icon{background:#e3eff5}
+
+@media(max-width:420px){
+  .timeline{
+    --timeline-column:72px;
+    --timeline-gap:10px;
+    --time-box-height:62px;
+    --item-gap:16px;
+  }
+  .timeline>.item>.time{
+    padding:8px 5px!important;
+    font-size:12px!important;
+  }
+  .timeline>.item>.itinerary-connector{
+    width:38px!important;
+    height:38px!important;
+  }
+  .timeline>.item>.itinerary-connector .connector-icon{
+    width:38px!important;
+    height:38px!important;
+    min-width:38px!important;
+    min-height:38px!important;
+    font-size:19px!important;
+  }
+}
