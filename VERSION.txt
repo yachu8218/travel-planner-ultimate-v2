@@ -1,11 +1,8 @@
 Travel Planner Ultimate
-Version: 3.1.1 — Cloudflare Build Stabilization
+Version: 3.1.2 — Cloudflare npm Compatibility
 
-修正：
-- 套件管理改為 pnpm 9.15.9。
-- 新增 pnpm-lock.yaml。
-- 移除 package-lock.json，避免 Cloudflare 執行 npm clean-install。
-- 新增 packageManager、Node 與 pnpm 版本限制。
-- 新增 .node-version，固定 Node 20.19.4。
-- pnpm install 與正式 production build 已通過。
-- 保留 v3.1.0 全部功能。
+- 重新建立乾淨 package-lock.json
+- 回到 npm 建置流程
+- 新增 .npmrc 與 .node-version
+- npm install 與 npm run build 已通過
+- 保留 v3.1.0 全部功能
