@@ -1,5 +1,5 @@
 {
-  "name": "旅行手帳 Travel Planner Ultimate 3.1.0",
+  "name": "旅行手帳 Travel Planner Ultimate 3.1.1",
   "short_name": "旅行手帳",
   "start_url": "/",
   "display": "standalone",
@@ -20,5 +20,5 @@
       "purpose": "any maskable"
     }
   ],
-  "description": "自動依時間排程、長按拖曳、10 種亮色主題與 iPhone 分享中心"
+  "description": "Cloudflare Pages pnpm 建置穩定版"
 }

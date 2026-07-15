@@ -1,21 +1,27 @@
-# Travel Planner Ultimate v3.1.0
+# Travel Planner Ultimate v3.1.1
 
-## 本版重點
+## Cloudflare Pages 建置穩定版
 
-### 自動排入行程
-從探索、地鐵或航班中心加入 Day 時，會按照開始時間插入正確位置。手動新增或修改時間後也會重新排序。
+本版專門修正：
 
-### 長按拖曳
-手機長按行程卡約 0.38 秒即可拖曳；桌面亦可使用滑鼠長按。放開後順序立即保存。每日標題旁另有「依時間重新排序」按鈕。
+```text
+npm error Exit handler never called!
+tsc: not found
+```
 
-### 20 種主題
-保留原本 10 種，新增檸檬汽水、蜜桃蘇打、草莓牛奶、橘子陽光、青蘋果、晴空藍、葡萄汽水、彩虹手帳、薄荷糖與陽光花園。
+專案已改用 `pnpm 9.15.9`，並移除 `package-lock.json`。
 
-### 分享中心
-- 分享唯讀連結：接收者可查看所有 Day，但無法修改。
-- 複製唯讀連結：iPhone／LINE 分享中斷時可直接貼上。
-- 分享完整旅行 PDF。
-- 匯出旅行備份檔。
-- 列印或另存 PDF。
+### 上傳 GitHub 時請確認
 
-更新後第一次部署會安裝新增的 PDF 與連結壓縮套件，Cloudflare Pages 建置時間可能比平常稍長。
+- `pnpm-lock.yaml` 有上傳
+- `package.json` 有覆蓋
+- `package-lock.json` 已從 GitHub 刪除
+
+### Cloudflare Build 設定
+
+```text
+Build command: pnpm run build
+Build output directory: dist
+```
+
+已設定的 `NODE_VERSION=20.19.4` 可以保留。

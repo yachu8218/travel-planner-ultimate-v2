@@ -1,16 +1,11 @@
 Travel Planner Ultimate
-Version: 3.1.0 — UX & Sharing Upgrade
+Version: 3.1.1 — Cloudflare Build Stabilization
 
-新增：
-- 探索、地鐵與航班加入目前 Day 時，自動依開始時間插入正確位置。
-- 新增或修改行程時間後，自動重新依時間排序。
-- 行程卡手機長按約 0.38 秒後可上下拖曳。
-- 拖曳靠近畫面頂端或底端時自動捲動。
-- 每日標題旁新增「依時間重新排序」按鈕。
-- 新增 10 種亮色主題，主題總數增為 20 種。
-- 新增分享中心。
-- 唯讀分享連結使用壓縮精簡資料，接收者可觀看但不能修改。
-- LINE 分享中斷時會自動複製唯讀連結。
-- 可產生並分享整份旅行 PDF。
-- 可匯出完整旅行備份 JSON。
-- 保留 v3.0.2 航班便條與待辦收合功能。
+修正：
+- 套件管理改為 pnpm 9.15.9。
+- 新增 pnpm-lock.yaml。
+- 移除 package-lock.json，避免 Cloudflare 執行 npm clean-install。
+- 新增 packageManager、Node 與 pnpm 版本限制。
+- 新增 .node-version，固定 Node 20.19.4。
+- pnpm install 與正式 production build 已通過。
+- 保留 v3.1.0 全部功能。
