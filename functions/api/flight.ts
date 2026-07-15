@@ -12,7 +12,9 @@ const json = (body: unknown, status = 200) =>
     }
   })
 
-const durationMinutes = (from?: string, to?: string) => {
+const durationMinutes = (fromUtc?: string, toUtc?: string, fromLocal?: string, toLocal?: string) => {
+  const from = fromUtc || fromLocal
+  const to = toUtc || toLocal
   if (!from || !to) return undefined
   const value = Math.round((new Date(to).getTime() - new Date(from).getTime()) / 60000)
   return Number.isFinite(value) && value > 0 ? value : undefined
@@ -35,7 +37,14 @@ const movement = (m: any) => ({
   baggage: m?.baggageBelt || "",
   scheduled: m?.scheduledTime?.local || m?.scheduledTime?.utc || "",
   revised: m?.revisedTime?.local || m?.revisedTime?.utc || "",
-  runway: m?.runwayTime?.local || m?.runwayTime?.utc || ""
+  runway: m?.runwayTime?.local || m?.runwayTime?.utc || "",
+  timezone: m?.airport?.timeZone || "",
+  utcOffset: (
+    m?.scheduledTime?.local ||
+    m?.revisedTime?.local ||
+    m?.runwayTime?.local ||
+    ""
+  ).match(/([+-]\d{2}:?\d{2})$/)?.[1] || ""
 })
 
 const mapFlight = (f: any, index: number) => {
@@ -53,7 +62,12 @@ const mapFlight = (f: any, index: number) => {
     arrival,
     aircraft: aircraftName || f.aircraft?.model || "",
     registration: f.aircraft?.reg || "",
-    durationMin: durationMinutes(timeValue(f.departure), timeValue(f.arrival)),
+    durationMin: durationMinutes(
+      f.departure?.scheduledTime?.utc || f.departure?.revisedTime?.utc || f.departure?.runwayTime?.utc,
+      f.arrival?.scheduledTime?.utc || f.arrival?.revisedTime?.utc || f.arrival?.runwayTime?.utc,
+      timeValue(f.departure),
+      timeValue(f.arrival)
+    ),
     distanceKm: f.greatCircleDistance?.km,
     source: "AeroDataBox",
     updatedAt: f.lastUpdatedUtc || ""

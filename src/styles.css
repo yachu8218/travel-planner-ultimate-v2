@@ -863,3 +863,159 @@ form select{
   background:#fff;
   font-size:9px;
 }
+
+/* =========================================================
+   v2.8.4 — 航班中心正式修正版
+   ========================================================= */
+.flight-result-head{
+  align-items:flex-start;
+  gap:10px;
+}
+.status-pill{
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+  width:68px;
+  min-width:68px;
+  height:68px;
+  padding:6px!important;
+  border-radius:50%!important;
+  line-height:1.1;
+  box-sizing:border-box;
+  word-break:keep-all;
+}
+.status-pill.success{background:#d7ead8!important}
+.status-pill.warning{background:#f3e0ae!important}
+.status-pill.danger{background:#f1cece!important}
+.status-pill.boarding{background:#d7e5f1!important}
+.status-pill.neutral{background:#e3edf2!important}
+.compact-flight-detail{
+  display:grid;
+  gap:11px;
+}
+.selected-flight-date{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  padding:8px 9px;
+  border:1.5px solid var(--ink);
+  border-radius:8px;
+  background:var(--soft);
+  font-size:11px;
+}
+.compact-route{
+  grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important;
+  margin:6px 0!important;
+  align-items:center;
+}
+.compact-route>div:first-child{text-align:left}
+.compact-route>div:last-child{text-align:right}
+.compact-route>div{
+  min-width:0;
+  gap:2px!important;
+}
+.compact-route b{font-size:25px!important}
+.compact-route span{
+  font-size:10px;
+  line-height:1.3;
+}
+.compact-route strong{
+  margin-top:4px;
+  font-size:14px;
+}
+.compact-route small,
+.compact-route em{
+  font-size:9px;
+  font-style:normal;
+  line-height:1.35;
+  color:#66716e;
+}
+.route-flight-center{
+  display:grid;
+  justify-items:center;
+  gap:3px;
+  color:var(--accent);
+}
+.route-flight-center span{
+  white-space:nowrap;
+  font-size:8px;
+}
+.compact-flight-meta{
+  display:grid!important;
+  grid-template-columns:1fr 1fr;
+  gap:6px!important;
+  margin:0!important;
+}
+.compact-flight-meta span{
+  display:flex;
+  gap:5px;
+  align-items:center;
+  min-height:32px;
+  padding:5px 7px;
+  border:1px solid var(--ink);
+  border-radius:7px;
+  background:#fff;
+  font-size:9px;
+}
+.compact-flight-meta b{font-weight:800}
+.flight-edit-fields{
+  display:grid;
+  gap:10px;
+  margin:8px 0 12px;
+  padding:11px;
+  border:2px dashed var(--primary);
+  border-radius:9px;
+  background:color-mix(in srgb,var(--soft) 48%,transparent);
+}
+.saved-flight-route em{
+  display:block;
+  margin-top:2px;
+  font-size:8px;
+  font-style:normal;
+  color:#68736f;
+}
+.saved-flight-info.compact-info{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+}
+.saved-flight-info.compact-info span{
+  min-height:30px;
+  align-items:center;
+}
+.timezone-reminder{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 8px;
+  border:1px solid #7ea6c1;
+  border-radius:7px;
+  background:#e5f0f6;
+  font-size:9px;
+}
+.place-title span,
+.result-secondary-name,
+.secondary-place-name{
+  display:inline;
+  margin-left:5px;
+  color:var(--accent);
+  font-size:.88em;
+  font-style:normal;
+  font-weight:700;
+}
+.autocomplete-list b .secondary-place-name{
+  display:block;
+  margin:2px 0 0;
+}
+@media(max-width:600px){
+  .flight-route.compact-route{
+    grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important;
+  }
+  .flight-route.compact-route>svg{transform:none!important}
+  .status-pill{
+    width:62px;
+    min-width:62px;
+    height:62px;
+    font-size:13px;
+  }
+}

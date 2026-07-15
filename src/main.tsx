@@ -18,11 +18,12 @@ type Item={
  transportMode?:TransportMode,from?:string,to?:string,durationMin?:number,distanceKm?:number,
  line?:string,flightNo?:string,address?:string,openingHours?:string,phone?:string,website?:string,
  lat?:number,lon?:number,rating?:number,userRatingCount?:number,openNow?:boolean,placeSource?:string,
- photoName?:string,primaryType?:string,
+ photoName?:string,primaryType?:string,secondaryName?:string,
  flightDate?:string,flightStatus?:string,airline?:string,aircraftRegistration?:string,
  departureScheduled?:string,arrivalScheduled?:string,flightUpdatedAt?:number,
  departureTerminal?:string,arrivalTerminal?:string,departureGate?:string,arrivalGate?:string,
- baggageBelt?:string,aircraftModel?:string,flightSource?:string
+ baggageBelt?:string,aircraftModel?:string,flightSource?:string,
+ departureTimezone?:string,arrivalTimezone?:string,departureUtcOffset?:string,arrivalUtcOffset?:string
 }
 type Day={id:string,date:string,title:string,items:Item[]}
 type Traveler={id:string;name:string}
@@ -37,12 +38,12 @@ type WeatherDay={date:string,code:number,max:number,min:number,rain:number}
 type PlaceResult={
  place_id:string;display_name:string;lat:string;lon:string;type?:string;class?:string;
  name?:string;openingHours?:string;phone?:string;website?:string;rating?:number;
- userRatingCount?:number;openNow?:boolean;source?:string;photoName?:string;primaryType?:string
+ userRatingCount?:number;openNow?:boolean;source?:string;photoName?:string;primaryType?:string;secondaryName?:string
 }
 type TranslationFavorite={id:string;source:string;translated:string;locale:string}
 type FlightMovement={
  airport?:string;iata?:string;icao?:string;terminal?:string;gate?:string;baggage?:string;
- scheduled?:string;revised?:string;runway?:string
+ scheduled?:string;revised?:string;runway?:string;timezone?:string;utcOffset?:string
 }
 type FlightResult={
  id?:string;flightNo:string;airline?:string;airlineIata?:string;status?:string;codeshareStatus?:string;
@@ -132,7 +133,16 @@ function ItemForm({initial,onSave,onClose,trip}:{initial?:Item,onSave:(x:Item)=>
   line:initial?.line||'',flightNo:initial?.flightNo||'',address:initial?.address||'',
   openingHours:initial?.openingHours||'',phone:initial?.phone||'',website:initial?.website||'',
   lat:initial?.lat,lon:initial?.lon,rating:initial?.rating,userRatingCount:initial?.userRatingCount,
-  openNow:initial?.openNow,placeSource:initial?.placeSource||'',photoName:initial?.photoName||'',primaryType:initial?.primaryType||''
+  openNow:initial?.openNow,placeSource:initial?.placeSource||'',photoName:initial?.photoName||'',primaryType:initial?.primaryType||'',
+  secondaryName:initial?.secondaryName||'',flightDate:initial?.flightDate||trip?.start||'',airline:initial?.airline||'',
+  departureTerminal:initial?.departureTerminal||'',arrivalTerminal:initial?.arrivalTerminal||'',
+  departureGate:initial?.departureGate||'',arrivalGate:initial?.arrivalGate||'',baggageBelt:initial?.baggageBelt||'',
+  aircraftModel:initial?.aircraftModel||'',aircraftRegistration:initial?.aircraftRegistration||'',
+  flightStatus:initial?.flightStatus||'',departureScheduled:initial?.departureScheduled||'',
+  arrivalScheduled:initial?.arrivalScheduled||'',flightUpdatedAt:initial?.flightUpdatedAt,
+  flightSource:initial?.flightSource||'',departureTimezone:initial?.departureTimezone||'',
+  arrivalTimezone:initial?.arrivalTimezone||'',departureUtcOffset:initial?.departureUtcOffset||'',
+  arrivalUtcOffset:initial?.arrivalUtcOffset||''
  })
  const [placeLoading,setPlaceLoading]=useState(false)
  const [suggestLoading,setSuggestLoading]=useState(false)
@@ -233,14 +243,14 @@ function ItemForm({initial,onSave,onClose,trip}:{initial?:Item,onSave:(x:Item)=>
   setV({...v,
    title:p.name||v.title,address:p.display_name,lat:Number(p.lat),lon:Number(p.lon),
    openingHours:p.openingHours||v.openingHours,phone:p.phone||v.phone,website:p.website||v.website,
-   rating:p.rating,userRatingCount:p.userRatingCount,openNow:p.openNow,placeSource:p.source||'',photoName:p.photoName||'',primaryType:p.primaryType||''
+   rating:p.rating,userRatingCount:p.userRatingCount,openNow:p.openNow,placeSource:p.source||'',photoName:p.photoName||'',primaryType:p.primaryType||'',secondaryName:p.secondaryName||''
   })
   setPlaceResults([]);setShowSuggestions(false)
   setPlaceMessage(p.source==='Google Places'?'已帶入 Google 店家資料。':'已帶入地址；營業時間與電話可手動補充。')
  }
  return <ModalShell title={initial?'編輯行程':'加入時間軸'} onClose={onClose}>
   <form onSubmit={e=>{e.preventDefault();onSave({
-   id:initial?.id||id(),type:v.type,start:v.start,end:v.end,title:v.title,note:v.note,
+   ...(initial||{}),id:initial?.id||id(),type:v.type,start:v.start,end:v.end,title:v.title,note:v.note,
    transportMode:isTransport?(v.type==='flight'?'flight':v.transportMode):undefined,
    from:isTransport?v.from:undefined,to:isTransport?v.to:undefined,
    durationMin:v.durationMin?Number(v.durationMin):undefined,distanceKm:v.distanceKm?Number(v.distanceKm):undefined,
@@ -251,13 +261,48 @@ function ItemForm({initial,onSave,onClose,trip}:{initial?:Item,onSave:(x:Item)=>
    rating:isPlace?v.rating:undefined,userRatingCount:isPlace?v.userRatingCount:undefined,
    openNow:isPlace?v.openNow:undefined,placeSource:isPlace?v.placeSource:undefined,
    photoName:isPlace?v.photoName:undefined,primaryType:isPlace?v.primaryType:undefined,
-   checks:v.type==='note'?v.note.split('\n').filter(Boolean).map((text,i)=>({id:initial?.checks?.[i]?.id||id(),text,done:initial?.checks?.[i]?.done||false})):undefined
+   secondaryName:isPlace?v.secondaryName:undefined,
+   flightDate:v.type==='flight'?v.flightDate:undefined,airline:v.type==='flight'?v.airline:undefined,
+   departureTerminal:v.type==='flight'?v.departureTerminal:undefined,
+   arrivalTerminal:v.type==='flight'?v.arrivalTerminal:undefined,
+   departureGate:v.type==='flight'?v.departureGate:undefined,arrivalGate:v.type==='flight'?v.arrivalGate:undefined,
+   baggageBelt:v.type==='flight'?v.baggageBelt:undefined,aircraftModel:v.type==='flight'?v.aircraftModel:undefined,
+   aircraftRegistration:v.type==='flight'?v.aircraftRegistration:undefined,
+   flightStatus:v.type==='flight'?v.flightStatus:undefined,
+   departureScheduled:v.type==='flight'?v.departureScheduled:undefined,
+   arrivalScheduled:v.type==='flight'?v.arrivalScheduled:undefined,
+   flightUpdatedAt:v.type==='flight'?v.flightUpdatedAt:undefined,
+   flightSource:v.type==='flight'?v.flightSource:undefined,
+   departureTimezone:v.type==='flight'?v.departureTimezone:undefined,
+   arrivalTimezone:v.type==='flight'?v.arrivalTimezone:undefined,
+   departureUtcOffset:v.type==='flight'?v.departureUtcOffset:undefined,
+   arrivalUtcOffset:v.type==='flight'?v.arrivalUtcOffset:undefined,
+   checks:v.type==='note'?v.note.split('\n').filter(Boolean).map((text,i)=>({id:initial?.checks?.[i]?.id||id(),text,done:initial?.checks?.[i]?.done||false})):initial?.checks
   })}}>
    <label>行程類型<select value={v.type} onChange={e=>setV({...v,type:e.target.value as TType})}><option value="place">景點</option><option value="meal">餐廳／甜點</option><option value="hotel">住宿</option><option value="transport">交通</option><option value="flight">飛機</option><option value="note">便條紙</option></select></label>
    <div className="two"><label>開始時間<div className="date-time-field"><Clock3 size={18}/><input type="time" value={v.start} onChange={e=>setV({...v,start:e.target.value})}/></div></label><label>結束時間<div className="date-time-field"><Clock3 size={18}/><input type="time" value={v.end} onChange={e=>setV({...v,end:e.target.value})}/></div></label></div>
    {v.type==='transport'&&<label>交通方式<select value={v.transportMode} onChange={e=>setV({...v,transportMode:e.target.value as TransportMode})}>{Object.entries(modeLabel).filter(([k])=>k!=='flight').map(([k,label])=><option key={k} value={k}>{modeEmoji[k as TransportMode]} {label}</option>)}</select></label>}
    {isTransport&&<><div className="two"><label>出發地<input value={v.from} onChange={e=>setV({...v,from:e.target.value})} placeholder="例如：海雲台站"/></label><label>抵達地<input value={v.to} onChange={e=>setV({...v,to:e.target.value})} placeholder="例如：西面站"/></label></div><div className="two"><label>通勤時間（分鐘）<input type="number" min="0" value={v.durationMin} onChange={e=>setV({...v,durationMin:e.target.value})}/></label><label>距離（公里）<input type="number" min="0" step="0.1" value={v.distanceKm} onChange={e=>setV({...v,distanceKm:e.target.value})}/></label></div><label>{v.type==='flight'?'航班號碼':'路線／車次'}<input value={v.type==='flight'?v.flightNo:v.line} onChange={e=>v.type==='flight'?setV({...v,flightNo:e.target.value.toUpperCase()}):setV({...v,line:e.target.value})} placeholder={v.type==='flight'?'例如：KE2086':'例如：2號線、KTX 105'}/></label></>}
-   <label>標題<div className="smart-title-field"><Search size={17}/><input required value={v.title} onChange={e=>{setV({...v,title:e.target.value});setShowSuggestions(true)}} onFocus={()=>placeResults.length&&setShowSuggestions(true)} placeholder={v.type==='note'?'例如：機場待辦':v.type==='transport'?'例如：前往飯店':'輸入店名或景點名稱'}/>{suggestLoading&&<RefreshCw className="spin" size={16}/>}</div></label>{isPlace&&showSuggestions&&placeResults.length>0&&<div className="autocomplete-list">{placeResults.map(p=><button type="button" key={p.place_id} onClick={()=>choosePlace(p)}><MapPin size={16}/><span><b>{p.name||p.display_name.split(',')[0]}</b><small>{p.display_name}</small>{p.rating!=null&&<em>⭐ {p.rating}（{p.userRatingCount||0}）{p.openNow===true?'・營業中':p.openNow===false?'・目前休息':''}</em>}</span></button>)}</div>}
+   {v.type==='flight'&&<section className="flight-edit-fields">
+    <label>航班日期<div className="date-time-field"><CalendarDays size={18}/><input type="date" value={v.flightDate} onChange={e=>setV({...v,flightDate:e.target.value})}/></div></label>
+    <div className="two">
+     <label>航空公司<input value={v.airline} onChange={e=>setV({...v,airline:e.target.value})} placeholder="例如：Korean Air"/></label>
+     <label>航班狀態<input value={v.flightStatus} onChange={e=>setV({...v,flightStatus:e.target.value})} placeholder="Expected／Delayed"/></label>
+    </div>
+    <div className="two">
+     <label>出發航廈<input value={v.departureTerminal} onChange={e=>setV({...v,departureTerminal:e.target.value})} placeholder="例如：1"/></label>
+     <label>抵達航廈<input value={v.arrivalTerminal} onChange={e=>setV({...v,arrivalTerminal:e.target.value})} placeholder="例如：1"/></label>
+    </div>
+    <div className="two">
+     <label>出發登機門<input value={v.departureGate} onChange={e=>setV({...v,departureGate:e.target.value})}/></label>
+     <label>抵達登機門<input value={v.arrivalGate} onChange={e=>setV({...v,arrivalGate:e.target.value})}/></label>
+    </div>
+    <div className="two">
+     <label>行李轉盤<input value={v.baggageBelt} onChange={e=>setV({...v,baggageBelt:e.target.value})}/></label>
+     <label>機型<input value={v.aircraftModel} onChange={e=>setV({...v,aircraftModel:e.target.value})}/></label>
+    </div>
+   </section>}
+   <label>標題<div className="smart-title-field"><Search size={17}/><input required value={v.title} onChange={e=>{setV({...v,title:e.target.value});setShowSuggestions(true)}} onFocus={()=>placeResults.length&&setShowSuggestions(true)} placeholder={v.type==='note'?'例如：機場待辦':v.type==='transport'?'例如：前往飯店':'輸入店名或景點名稱'}/>{suggestLoading&&<RefreshCw className="spin" size={16}/>}</div></label>{isPlace&&showSuggestions&&placeResults.length>0&&<div className="autocomplete-list">{placeResults.map(p=><button type="button" key={p.place_id} onClick={()=>choosePlace(p)}><MapPin size={16}/><span><b>{p.name||p.display_name.split(',')[0]}{p.secondaryName&&p.secondaryName!==p.name&&<em className="secondary-place-name">（{p.secondaryName}）</em>}</b><small>{p.display_name}</small>{p.rating!=null&&<em>⭐ {p.rating}（{p.userRatingCount||0}）{p.openNow===true?'・營業中':p.openNow===false?'・目前休息':''}</em>}</span></button>)}</div>}
    {isPlace&&<section className="place-enrich">
     <button type="button" className="btn full" onClick={searchPlace} disabled={placeLoading}>{placeLoading?<><RefreshCw className="spin" size={17}/>搜尋中</>:<><Search size={17}/>重新搜尋完整資料</>}</button>
     {placeMessage&&<p className="place-message">{placeMessage}</p>}
@@ -329,8 +374,24 @@ const flightStatusLabel=(status='')=>{
  return map[status]||status||'已取得資料'
 }
 const bestFlightTime=(m:FlightMovement)=>m.revised||m.runway||m.scheduled
-const timeOnly=(value?:string)=>value?new Date(value).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false}):'—'
-const fullFlightTime=(value?:string)=>value?new Date(value).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}):'—'
+const localParts=(value?:string)=>{
+ if(!value)return {date:'',time:'—'}
+ const match=value.match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/)
+ if(match)return {date:`${Number(match[2])}/${Number(match[3])}`,time:`${match[4]}:${match[5]}`}
+ const d=new Date(value)
+ if(Number.isNaN(d.getTime()))return {date:'',time:value}
+ return {
+  date:d.toLocaleDateString('zh-TW',{month:'numeric',day:'numeric'}),
+  time:d.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false})
+ }
+}
+const timeOnly=(value?:string)=>localParts(value).time
+const fullFlightTime=(value?:string)=>{
+ const p=localParts(value)
+ return p.date?`${p.date} ${p.time}`:p.time
+}
+const offsetLabel=(value?:string)=>value?`GMT${value.replace(':00','')}`:''
+const terminalLabel=(value?:string)=>value?`第 ${String(value).replace(/^T/i,'')} 航廈`:'航廈待公布'
 
 function FlightResultCard({flight,selected,onSelect}:{key?:React.Key;flight:FlightResult;selected:boolean;onSelect:()=>void}){
  const dep=flight.departure,arr=flight.arrival
@@ -406,6 +467,8 @@ function FlightCenter({trip,onAdd}:{trip:Trip,onAdd:(x:Item)=>void}){
    departureScheduled:depTime,arrivalScheduled:arrTime,flightUpdatedAt:Date.now(),
    departureTerminal:dep.terminal,arrivalTerminal:arr.terminal,departureGate:dep.gate,
    arrivalGate:arr.gate,baggageBelt:arr.baggage,flightSource:result.source||'AeroDataBox',
+   departureTimezone:dep.timezone,arrivalTimezone:arr.timezone,
+   departureUtcOffset:dep.utcOffset,arrivalUtcOffset:arr.utcOffset,
    transportMode:'flight',
    from:[dep.airport,dep.iata].filter(Boolean).join(' '),
    to:[arr.airport,arr.iata].filter(Boolean).join(' '),
@@ -469,18 +532,20 @@ function FlightCenter({trip,onAdd}:{trip:Trip,onAdd:(x:Item)=>void}){
   {results.length>0&&<section className="flight-results-section">
    <div className="result-section-head"><div><small>SEARCH RESULTS</small><h3>選擇正確班次</h3></div><span>{results.length} 筆</span></div>
    <div className="flight-choice-list">{results.map((f,i)=><FlightResultCard key={f.id||`${f.flightNo}-${i}`} flight={f} selected={selected===i} onSelect={()=>setSelected(i)}/>)}</div>
-   <article className="card selected-flight-detail">
-    <div className="flight-result-head"><div><small>{results[selected].airline||'AIRLINE'}</small><h2>{results[selected].flightNo}</h2></div><span className="status-pill">{flightStatusLabel(results[selected].status)}</span></div>
-    <div className="flight-route">
-     <div><b>{results[selected].departure.iata||'—'}</b><span>{results[selected].departure.airport||'出發機場'}</span><strong>{fullFlightTime(bestFlightTime(results[selected].departure))}</strong><small>{results[selected].departure.terminal?`Terminal ${results[selected].departure.terminal}`:''} {results[selected].departure.gate?`Gate ${results[selected].departure.gate}`:''}</small></div>
-     <Plane size={30}/>
-     <div><b>{results[selected].arrival.iata||'—'}</b><span>{results[selected].arrival.airport||'抵達機場'}</span><strong>{fullFlightTime(bestFlightTime(results[selected].arrival))}</strong><small>{results[selected].arrival.terminal?`Terminal ${results[selected].arrival.terminal}`:''} {results[selected].arrival.baggage?`行李 ${results[selected].arrival.baggage}`:''}</small></div>
+   <article className="card selected-flight-detail compact-flight-detail">
+    <div className="flight-result-head"><div><small>{results[selected].airline||'AIRLINE'}</small><h2>{results[selected].flightNo}</h2></div><span className={`status-pill ${flightStatusClass(results[selected].status)}`}>{flightStatusLabel(results[selected].status)}</span></div>
+    <div className="selected-flight-date"><CalendarDays size={17}/><b>航班日期：{date}</b></div>
+    <div className="flight-route compact-route">
+     <div><b>{results[selected].departure.iata||'—'}</b><span>{results[selected].departure.airport||'出發機場'}</span><strong>{fullFlightTime(bestFlightTime(results[selected].departure))}</strong><small>{terminalLabel(results[selected].departure.terminal)}{results[selected].departure.gate?`・Gate ${results[selected].departure.gate}`:'・Gate 待公布'}</small><em>{offsetLabel(results[selected].departure.utcOffset)||results[selected].departure.timezone||''}</em></div>
+     <div className="route-flight-center"><Plane size={27}/><span>{results[selected].durationMin?`${Math.floor(results[selected].durationMin/60)}小時${results[selected].durationMin%60}分`:''}</span></div>
+     <div><b>{results[selected].arrival.iata||'—'}</b><span>{results[selected].arrival.airport||'抵達機場'}</span><strong>{fullFlightTime(bestFlightTime(results[selected].arrival))}</strong><small>{terminalLabel(results[selected].arrival.terminal)}{results[selected].arrival.baggage?`・行李 ${results[selected].arrival.baggage}`:'・行李待公布'}</small><em>{offsetLabel(results[selected].arrival.utcOffset)||results[selected].arrival.timezone||''}</em></div>
     </div>
-    <div className="flight-meta">
-     {results[selected].durationMin&&<span>飛行約 {Math.floor(results[selected].durationMin/60)}小時 {results[selected].durationMin%60}分</span>}
-     {results[selected].aircraft&&<span>機型 {results[selected].aircraft}</span>}
-     {results[selected].registration&&<span>機身 {results[selected].registration}</span>}
-     <span>來源：{results[selected].source||'AeroDataBox'}</span>
+    <div className="flight-meta compact-flight-meta">
+     <span><b>航廈</b>{results[selected].departure.terminal?`T${results[selected].departure.terminal}`:'待公布'} → {results[selected].arrival.terminal?`T${results[selected].arrival.terminal}`:'待公布'}</span>
+     <span><b>登機門</b>{results[selected].departure.gate||'待公布'}</span>
+     <span><b>行李轉盤</b>{results[selected].arrival.baggage||'待公布'}</span>
+     <span><b>機型</b>{results[selected].aircraft||'待公布'}</span>
+     <span><b>資料來源</b>{results[selected].source||'AeroDataBox'}</span>
     </div>
     <button className="btn primary full" onClick={addResult}><Plus size={18}/>加入目前 Day</button>
    </article>
@@ -504,7 +569,7 @@ function ExploreCenter({trip,onAdd,onFavorite,onRemoveFavorite}:{trip:Trip,onAdd
   address:p.display_name,lat:Number(p.lat),lon:Number(p.lon),
   openingHours:p.openingHours,phone:p.phone,website:p.website,rating:p.rating,
   userRatingCount:p.userRatingCount,openNow:p.openNow,photoName:p.photoName,
-  primaryType:p.primaryType,placeSource:p.place_id
+  primaryType:p.primaryType,secondaryName:p.secondaryName,placeSource:p.place_id
  })
  const search=async()=>{
   if(!q.trim()){setMsg('請輸入地點、店名或地址。');return}
@@ -553,7 +618,7 @@ function ExploreCenter({trip,onAdd,onFavorite,onRemoveFavorite}:{trip:Trip,onAdd
      {p.photoName&&<img src={`/api/place-photo?name=${encodeURIComponent(p.photoName)}&maxWidth=700`} alt={p.name||''} loading="lazy" onError={e=>e.currentTarget.style.display='none'}/>}
      <div className="place-result-content">
       <small>{/restaurant|food/.test(p.primaryType||'')?'餐廳／甜點':'景點／地點'}</small>
-      <h3>{p.name||p.display_name.split(',')[0]}</h3>
+      <h3>{p.name||p.display_name.split(',')[0]}{p.secondaryName&&p.secondaryName!==p.name&&<span className="result-secondary-name">（{p.secondaryName}）</span>}</h3>
       {p.rating!=null&&<div className="result-badges"><span>⭐ {p.rating}</span><span>👥 {p.userRatingCount||0}</span>{p.openNow!=null&&<span>{p.openNow?'● 營業中':'● 目前休息'}</span>}</div>}
       <p><MapPin size={14}/>{p.display_name}</p>
       <div className="result-actions">
@@ -578,7 +643,7 @@ function ExploreCenter({trip,onAdd,onFavorite,onRemoveFavorite}:{trip:Trip,onAdd
     {f.photoName&&<img src={`/api/place-photo?name=${encodeURIComponent(f.photoName)}&maxWidth=700`} alt={f.title} loading="lazy" onError={e=>e.currentTarget.style.display='none'}/>}
     <div>
      <span className="favorite-type">{placeCategory(f).emoji} {placeCategory(f).label}</span>
-     <h3>{f.title}</h3>
+     <h3>{f.title}{f.secondaryName&&f.secondaryName!==f.title&&<span className="result-secondary-name">（{f.secondaryName}）</span>}</h3>
      {f.rating!=null&&<p className="favorite-rating">⭐ {f.rating}・{f.userRatingCount||0} 則{f.openNow===true?'・營業中':f.openNow===false?'・目前休息':''}</p>}
      {f.address&&<p className="favorite-address"><MapPin size={14}/>{shortAddress(f.address)}</p>}
      <div className="favorite-actions">
@@ -863,7 +928,7 @@ function PlaceCardDetails({item}:{item:Item}){
   </div>}
   <div className="place-card-head">
    <span className="place-category-badge">{category.emoji} {category.label}</span>
-   <h3 className="place-title">{item.title}</h3>
+   <h3 className="place-title">{item.title}{item.secondaryName&&item.secondaryName!==item.title&&<span>（{item.secondaryName}）</span>}</h3>
   </div>
   {item.rating!=null&&<div className="place-badges">
    <span>⭐ {item.rating}</span>
@@ -1005,6 +1070,13 @@ const downloadFlightICS=(item:Item)=>{
  setTimeout(()=>URL.revokeObjectURL(url),1000)
 }
 
+const timezoneDifferenceText=(item:Item)=>{
+ const parse=(s?:string)=>{if(!s)return null;const m=s.match(/^([+-])(\d{2}):?(\d{2})?$/);if(!m)return null;return (m[1]==='-'?-1:1)*(Number(m[2])*60+Number(m[3]||0))}
+ const a=parse(item.departureUtcOffset),b=parse(item.arrivalUtcOffset)
+ if(a==null||b==null||a===b)return ''
+ const diff=(b-a)/60
+ return `抵達地比出發地${diff>0?'快':'慢'} ${Math.abs(diff)} 小時`
+}
 function FlightCardDetails({item,onRefresh,refreshing}:{item:Item;onRefresh?:()=>void;refreshing?:boolean}){
  const status=flightStatusLabel(item.flightStatus)
  const updated=item.flightUpdatedAt?new Date(item.flightUpdatedAt).toLocaleString('zh-TW',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}):''
@@ -1019,28 +1091,29 @@ function FlightCardDetails({item,onRefresh,refreshing}:{item:Item;onRefresh?:()=
    <span className={`saved-flight-status ${flightStatusClass(item.flightStatus)}`}>{status}</span>
   </div>
   <div className={`flight-reminder-strip ${countdown.urgent?'urgent':''} ${countdown.past?'past':''}`}>
-   <div><CalendarDays size={16}/><b>{countdown.label}</b></div>
-   <small>{airportArrivalAdvice(item)}</small>
+   <div><CalendarDays size={16}/><b>{item.flightDate?`航班日期：${item.flightDate}`:countdown.label}</b></div>
+   <small>{item.flightDate?`${countdown.label}・${airportArrivalAdvice(item)}`:airportArrivalAdvice(item)}</small>
   </div>
   <div className="saved-flight-route">
    <div>
     <b>{depCode}</b>
     <strong>{item.start}</strong>
-    <small>{item.departureTerminal&&`航廈 ${item.departureTerminal}`}{item.departureGate&&`・Gate ${item.departureGate}`}</small>
+    <small>{terminalLabel(item.departureTerminal)}{item.departureGate?`・Gate ${item.departureGate}`:'・Gate 待公布'}</small><em>{offsetLabel(item.departureUtcOffset)||item.departureTimezone||''}</em>
    </div>
    <div className="saved-flight-path"><Plane size={20}/><span>{item.durationMin?`${Math.floor(item.durationMin/60)}小時${item.durationMin%60}分`:''}</span></div>
    <div>
     <b>{arrCode}</b>
     <strong>{item.end}</strong>
-    <small>{item.arrivalTerminal&&`航廈 ${item.arrivalTerminal}`}{item.baggageBelt&&`・行李 ${item.baggageBelt}`}</small>
+    <small>{terminalLabel(item.arrivalTerminal)}{item.baggageBelt?`・行李 ${item.baggageBelt}`:'・行李待公布'}</small><em>{offsetLabel(item.arrivalUtcOffset)||item.arrivalTimezone||''}</em>
    </div>
   </div>
-  <div className="saved-flight-info">
-   {item.departureGate&&<span><b>登機門</b>{item.departureGate}</span>}
-   {item.baggageBelt&&<span><b>行李轉盤</b>{item.baggageBelt}</span>}
-   {item.aircraftModel&&<span><b>機型</b>{item.aircraftModel}</span>}
-   {item.aircraftRegistration&&<span><b>機身</b>{item.aircraftRegistration}</span>}
+  <div className="saved-flight-info compact-info">
+   <span><b>航廈</b>{item.departureTerminal?`T${item.departureTerminal}`:'待公布'} → {item.arrivalTerminal?`T${item.arrivalTerminal}`:'待公布'}</span>
+   <span><b>登機門</b>{item.departureGate||'待公布'}</span>
+   <span><b>行李轉盤</b>{item.baggageBelt||'待公布'}</span>
+   <span><b>機型</b>{item.aircraftModel||'待公布'}</span>
   </div>
+  {timezoneDifferenceText(item)&&<div className="timezone-reminder"><Clock3 size={14}/>{timezoneDifferenceText(item)}</div>}
   {checks.length>0&&<div className="flight-check-progress">
    <div><span>登機前準備</span><b>{done}/{checks.length}</b></div>
    <div className="flight-progress-track"><i style={{width:`${checks.length?done/checks.length*100:0}%`}}/></div>
@@ -1151,6 +1224,8 @@ function App(){
     departureScheduled:depTime||item.departureScheduled,arrivalScheduled:arrTime||item.arrivalScheduled,
     departureTerminal:dep.terminal,arrivalTerminal:arr.terminal,departureGate:dep.gate,
     arrivalGate:arr.gate,baggageBelt:arr.baggage,aircraftModel:best.aircraft,
+    departureTimezone:dep.timezone,arrivalTimezone:arr.timezone,
+    departureUtcOffset:dep.utcOffset,arrivalUtcOffset:arr.utcOffset,
     aircraftRegistration:best.registration,durationMin:best.durationMin,distanceKm:best.distanceKm,
     from:[dep.airport,dep.iata].filter(Boolean).join(' ')||item.from,
     to:[arr.airport,arr.iata].filter(Boolean).join(' ')||item.to,

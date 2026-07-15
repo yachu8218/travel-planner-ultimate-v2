@@ -36,7 +36,8 @@ const mapPlace = (p: any) => {
     openNow: p.currentOpeningHours?.openNow ?? p.regularOpeningHours?.openNow,
     source: "Google Places",
     photoName: p.photos?.[0]?.name || "",
-    primaryType: p.primaryType || ""
+    primaryType: p.primaryType || "",
+    secondaryName: ""
   }
 }
 
@@ -67,41 +68,52 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
   if (regionCode) body.regionCode = regionCode
 
   try {
-    const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "X-Goog-Api-Key": env.GOOGLE_PLACES_API_KEY,
-        "X-Goog-FieldMask": [
-          "places.id",
-          "places.displayName",
-          "places.formattedAddress",
-          "places.location",
-          "places.regularOpeningHours",
-          "places.currentOpeningHours",
-          "places.nationalPhoneNumber",
-          "places.websiteUri",
-          "places.rating",
-          "places.userRatingCount",
-          "places.businessStatus",
-          "places.photos",
-          "places.primaryType"
-        ].join(",")
-      },
-      body: JSON.stringify(body)
-    })
+    const fieldMask = [
+      "places.id","places.displayName","places.formattedAddress","places.location",
+      "places.regularOpeningHours","places.currentOpeningHours","places.nationalPhoneNumber",
+      "places.websiteUri","places.rating","places.userRatingCount","places.businessStatus",
+      "places.photos","places.primaryType"
+    ].join(",")
+    const requestPlaces = async (languageCode: string) => {
+      const response = await fetch("https://places.googleapis.com/v1/places:searchText", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "X-Goog-Api-Key": env.GOOGLE_PLACES_API_KEY!,
+          "X-Goog-FieldMask": fieldMask
+        },
+        body: JSON.stringify({...body, languageCode})
+      })
+      const data: any = await response.json()
+      return {response,data}
+    }
 
-    const data: any = await response.json()
-    if (!response.ok) {
+    const primary = await requestPlaces(language)
+    if (!primary.response.ok) {
       return json({
         configured: true,
-        googleStatus: response.status,
-        message: data?.error?.message || `Google Places 回傳錯誤 ${response.status}。`,
+        googleStatus: primary.response.status,
+        message: primary.data?.error?.message || `Google Places 回傳錯誤 ${primary.response.status}。`,
         results: []
       }, 200)
     }
 
-    const results = (data.places || []).map(mapPlace)
+    const results = (primary.data.places || []).map(mapPlace)
+
+    if (language !== "zh") {
+      try {
+        const chinese = await requestPlaces("zh-TW")
+        if (chinese.response.ok) {
+          const chineseNames = new Map(
+            (chinese.data.places || []).map((p:any)=>[p.id,p.displayName?.text || ""])
+          )
+          for (const result of results) {
+            const translated = chineseNames.get(result.place_id)
+            if (translated && translated !== result.name) result.secondaryName = translated
+          }
+        }
+      } catch {}
+    }
     return json({
       configured: true,
       query: q,
