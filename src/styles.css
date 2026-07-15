@@ -1181,3 +1181,180 @@ form select{
   .itinerary-connector{min-height:42px!important}
   .itinerary-connector .connector-icon{width:35px!important;height:35px!important;min-width:35px!important;min-height:35px!important;font-size:18px!important}
 }
+
+/* =========================================================
+   v2.9.2 — Timeline 真正對齊版
+   ========================================================= */
+
+/*
+  Timeline 本身成為兩欄網格：
+  左欄固定放時間框與小插畫，右欄只放行程卡。
+*/
+.timeline{
+  --timeline-column:86px;
+  --timeline-gap:12px;
+  position:relative;
+  display:grid!important;
+  grid-template-columns:var(--timeline-column) minmax(0,1fr)!important;
+  column-gap:var(--timeline-gap)!important;
+  row-gap:0!important;
+  align-items:stretch;
+  overflow:visible!important;
+}
+
+/* 整條垂直線與左欄正中央完全對齊 */
+.timeline::before{
+  content:"";
+  position:absolute;
+  top:0;
+  bottom:0;
+  left:calc(var(--timeline-column) / 2);
+  width:1.5px;
+  background:color-mix(in srgb,var(--ink) 78%,transparent);
+  transform:translateX(-50%);
+  z-index:0;
+  pointer-events:none;
+}
+
+/*
+  article 不再建立自己的兩欄；
+  它的 time 與 body 直接成為 timeline grid 的子項目。
+*/
+.timeline>.item{
+  display:contents!important;
+}
+
+.timeline>.item>.time{
+  grid-column:1!important;
+  position:relative;
+  z-index:3;
+  align-self:start;
+  width:100%;
+  box-sizing:border-box;
+  margin:0 0 18px!important;
+  background:var(--soft);
+}
+
+.timeline>.item>.body{
+  grid-column:2!important;
+  position:relative;
+  z-index:2;
+  min-width:0;
+  margin:0 0 18px!important;
+  overflow:visible!important;
+}
+
+/*
+  小插畫獨占左欄一列，位於上一個時間框與下一個時間框之間。
+  右欄同列保持空白，因此不會擠壓或插入行程卡。
+*/
+.timeline>.itinerary-connector{
+  grid-column:1!important;
+  position:relative!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:100%!important;
+  min-height:74px!important;
+  margin:-9px 0 9px!important;
+  padding:0!important;
+  z-index:4!important;
+  overflow:visible!important;
+  pointer-events:none;
+}
+
+/* 取消舊版每個 connector 自己畫的短線，統一使用 timeline 主線 */
+.timeline>.itinerary-connector::before,
+.timeline>.itinerary-connector::after{
+  display:none!important;
+}
+
+/* 圓圈中心與 timeline 主線為同一個 X 座標 */
+.timeline>.itinerary-connector .connector-icon{
+  position:relative!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:42px!important;
+  height:42px!important;
+  min-width:42px!important;
+  min-height:42px!important;
+  margin:0 auto!important;
+  padding:0!important;
+  box-sizing:border-box!important;
+  border:1.5px solid currentColor!important;
+  border-radius:50%!important;
+  background:var(--paper);
+  box-shadow:2px 2px 0 color-mix(in srgb,var(--ink) 58%,transparent);
+  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif!important;
+  font-size:21px!important;
+  font-style:normal!important;
+  font-weight:400!important;
+  line-height:42px!important;
+  text-align:center!important;
+  text-indent:0!important;
+  letter-spacing:0!important;
+  white-space:nowrap!important;
+  overflow:hidden!important;
+  transform:none!important;
+}
+
+/* Safari Emoji 視覺中心微調 */
+@supports (-webkit-touch-callout:none){
+  .timeline>.itinerary-connector .connector-icon{
+    padding-bottom:1px!important;
+  }
+}
+
+/* 各交通類型使用對應外框與淡色背景 */
+.timeline>.itinerary-connector.flight{color:#5eaccf}
+.timeline>.itinerary-connector.flight .connector-icon{background:#e6f2f7}
+.timeline>.itinerary-connector.meal{color:#e27b34}
+.timeline>.itinerary-connector.meal .connector-icon{background:#faeee4}
+.timeline>.itinerary-connector.hotel{color:#8d72b5}
+.timeline>.itinerary-connector.hotel .connector-icon{background:#eee8f5}
+.timeline>.itinerary-connector.metro,
+.timeline>.itinerary-connector.train{color:#4d8a65}
+.timeline>.itinerary-connector.metro .connector-icon,
+.timeline>.itinerary-connector.train .connector-icon{background:#e4f0e8}
+.timeline>.itinerary-connector.bus,
+.timeline>.itinerary-connector.taxi,
+.timeline>.itinerary-connector.car{color:#d75849}
+.timeline>.itinerary-connector.bus .connector-icon,
+.timeline>.itinerary-connector.taxi .connector-icon,
+.timeline>.itinerary-connector.car .connector-icon{background:#fae9df}
+.timeline>.itinerary-connector.walk{color:#6b7c72}
+.timeline>.itinerary-connector.walk .connector-icon{background:#edf1ee}
+.timeline>.itinerary-connector.place{color:#668d58}
+.timeline>.itinerary-connector.place .connector-icon{background:#eaf1e7}
+.timeline>.itinerary-connector.ferry{color:#5489a5}
+.timeline>.itinerary-connector.ferry .connector-icon{background:#e3eff5}
+
+/* 最後一個行程後不產生 connector；既有元件本身已在 next 不存在時回傳 null */
+.timeline>.item:last-of-type>.time,
+.timeline>.item:last-of-type>.body{
+  margin-bottom:6px!important;
+}
+
+@media(max-width:420px){
+  .timeline{
+    --timeline-column:72px;
+    --timeline-gap:10px;
+  }
+  .timeline>.item>.time{
+    padding:8px 5px!important;
+    font-size:12px;
+  }
+  .timeline>.itinerary-connector{
+    min-height:66px!important;
+    margin:-8px 0 8px!important;
+  }
+  .timeline>.itinerary-connector .connector-icon{
+    width:38px!important;
+    height:38px!important;
+    min-width:38px!important;
+    min-height:38px!important;
+    font-size:19px!important;
+    line-height:38px!important;
+  }
+}

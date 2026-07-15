@@ -1,5 +1,5 @@
 {
-  "name": "旅行手帳 Travel Planner Ultimate 2.9.1",
+  "name": "旅行手帳 Travel Planner Ultimate 2.9.2",
   "short_name": "旅行手帳",
   "start_url": "/",
   "display": "standalone",
@@ -20,5 +20,5 @@
       "purpose": "any maskable"
     }
   ],
-  "description": "左側時間軸小插畫位置與置中修正版"
+  "description": "時間框、垂直線與小插畫完全對齊的 Timeline 修正版"
 }
