@@ -1,4 +1,4 @@
-import React,{useEffect,useMemo,useState} from 'react'
+import React,{useEffect,useMemo,useRef,useState} from 'react'
 import ReactDOM from 'react-dom/client'
 import {
  Plus,Pencil,Copy,Trash2,ArrowLeft,Share2,FileDown,Upload,Palette,Clock3,Ruler,
@@ -6,11 +6,12 @@ import {
  Languages,UserRound,RefreshCw,Plane,MapPin,CloudSun,CheckCircle2,MoreHorizontal,
  ArrowUp,ArrowDown,X,Search,Navigation,Phone,Globe2,ImagePlus,Ticket,ReceiptText,Star,NotebookPen,Heart,HeartOff
 } from 'lucide-react'
+import {compressToEncodedURIComponent,decompressFromEncodedURIComponent} from 'lz-string'
 import './styles.css'
 
 type TType='place'|'meal'|'hotel'|'transport'|'flight'|'note'
 type TransportMode='walk'|'metro'|'bus'|'taxi'|'car'|'train'|'flight'|'ferry'
-type ThemeId='summer'|'journal'|'sakura'|'forest'|'coast'|'lavender'|'neon'|'cafe'|'christmas'|'washi'
+type ThemeId='summer'|'journal'|'sakura'|'forest'|'coast'|'lavender'|'neon'|'cafe'|'christmas'|'washi'|'lemon'|'peach'|'strawberry'|'orange'|'apple'|'sky'|'grape'|'rainbow'|'mint'|'sunny'
 type AppPage='home'|'itinerary'|'explore'|'wallet'|'translate'|'more'
 type Check={id:string,text:string,done:boolean}
 type Item={
@@ -69,6 +70,16 @@ const themes:{id:ThemeId;name:string;desc:string;colors:string[]}[]=[
  {id:'cafe',name:'咖啡館',desc:'奶茶・可可・焦糖',colors:['#c8aa86','#6f5142','#d49a5b']},
  {id:'christmas',name:'聖誕旅行',desc:'酒紅・深綠・金色',colors:['#944b55','#385849','#d1ad5b']},
  {id:'washi',name:'和風紙',desc:'米白・靛藍・赤紅',colors:['#e8ddc5','#3e5872','#a94e4e']},
+ {id:'lemon',name:'檸檬汽水',desc:'亮黃・天空藍・白色',colors:['#ffe66d','#67c7ff','#fffdf1']},
+ {id:'peach',name:'蜜桃蘇打',desc:'蜜桃粉・奶油橘・亮白',colors:['#ffb5a7','#ffd166','#fff7ef']},
+ {id:'strawberry',name:'草莓牛奶',desc:'莓果粉・淡粉・奶白',colors:['#ff6f91','#ffc2d1','#fff6f2']},
+ {id:'orange',name:'橘子陽光',desc:'鮮橘・亮黃・奶油白',colors:['#ff9f43','#ffe66d','#fff8e7']},
+ {id:'apple',name:'青蘋果',desc:'蘋果綠・檸檬黃・白色',colors:['#7bd389','#e9f76f','#f8fff4']},
+ {id:'sky',name:'晴空藍',desc:'天空藍・水藍・亮白',colors:['#55c2ff','#94e1ff','#f5fcff']},
+ {id:'grape',name:'葡萄汽水',desc:'亮紫・粉藍・柔粉',colors:['#a78bfa','#93c5fd','#f7d6ff']},
+ {id:'rainbow',name:'彩虹手帳',desc:'粉紅・亮黃・水綠',colors:['#ff8fab','#ffe066','#70d6b9']},
+ {id:'mint',name:'薄荷糖',desc:'薄荷綠・湖水藍・亮白',colors:['#70d6b9','#6ed5e8','#f4fffb']},
+ {id:'sunny',name:'陽光花園',desc:'向日葵黃・嫩綠・珊瑚粉',colors:['#ffd23f','#8bd17c','#ff8a80']},
 ]
 const rules=[
  [/busan|seoul|korea|釜山|首爾|韓國|南韓/i,'KR','KRW','韓文','ko-KR',35.1796,129.0756],
@@ -87,11 +98,40 @@ const load=():State=>{try{const s=JSON.parse(localStorage.getItem(KEY)||'null');
 const save=(s:State)=>localStorage.setItem(KEY,JSON.stringify(s))
 const b64=(s:string)=>btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
 const ub64=(s:string)=>decodeURIComponent(escape(atob(s.replace(/-/g,'+').replace(/_/g,'/').padEnd(Math.ceil(s.length/4)*4,'='))))
-const shared=(()=>{const q=new URLSearchParams(location.search).get('trip');if(!q)return null;try{return normalizeTrip(JSON.parse(ub64(q)))}catch{return null}})()
+const shared=(()=>{const params=new URLSearchParams(location.search);const compact=params.get('share');const legacy=params.get('trip');try{if(compact){const raw=decompressFromEncodedURIComponent(compact);return raw?normalizeTrip(JSON.parse(raw)):null}if(legacy)return normalizeTrip(JSON.parse(ub64(legacy)))}catch{}return null})()
 const wicon=(c:number)=>c===0?'☀️':c<=3?'⛅':c<=48?'🌫️':c<=67?'🌧️':c<=77?'❄️':c<=82?'🌦️':'⛈️'
 const modeLabel:Record<TransportMode,string>={walk:'步行',metro:'地鐵',bus:'公車',taxi:'計程車',car:'自駕／租車',train:'火車／高鐵／KTX',flight:'飛機',ferry:'渡輪'}
 const modeEmoji:Record<TransportMode,string>={walk:'🚶',metro:'🚇',bus:'🚌',taxi:'🚕',car:'🚗',train:'🚄',flight:'✈️',ferry:'⛴️'}
 const typeName:Record<TType,string>={place:'景點',meal:'餐廳／甜點',hotel:'住宿',transport:'交通',flight:'航班',note:'便條紙'}
+
+const timeValue=(value?:string)=>{
+ if(!value)return Number.MAX_SAFE_INTEGER
+ const match=value.match(/^(\d{1,2}):(\d{2})/)
+ if(!match)return Number.MAX_SAFE_INTEGER
+ return Number(match[1])*60+Number(match[2])
+}
+const sortItemsByTime=(items:Item[])=>items
+ .map((item,index)=>({item,index,value:timeValue(item.start)}))
+ .sort((a,b)=>a.value-b.value||a.index-b.index)
+ .map(x=>x.item)
+const compactReadonlyTrip=(trip:Trip):Trip=>({
+ ...trip,
+ cover:undefined,
+ favorites:undefined,
+ wallet:undefined,
+ days:trip.days.map(day=>({...day,items:day.items.map(item=>({
+  ...item,
+  photoName:undefined,
+  checks:item.checks?.map(check=>({...check}))
+ }))}))
+})
+const escapeHtml=(value:any)=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]||ch))
+const readonlyShareUrl=(trip:Trip)=>{
+ const url=new URL(location.origin+location.pathname)
+ url.searchParams.set('share',compressToEncodedURIComponent(JSON.stringify(compactReadonlyTrip(trip))))
+ return url.toString()
+}
+
 
 function ThemePicker({value,onChange}:{value:ThemeId,onChange:(t:ThemeId)=>void}){
  return <div className="theme-grid">{themes.map(t=><button type="button" key={t.id} className={`theme-option ${value===t.id?'selected':''}`} onClick={()=>onChange(t.id)}><span className="theme-dots">{t.colors.map(c=><i key={c} style={{background:c}}/>)}</span><b>{t.name}</b><small>{t.desc}</small></button>)}</div>
@@ -1466,6 +1506,12 @@ function App(){
  const [transitOpen,setTransitOpen]=useState(false)
  const [smartMenu,setSmartMenu]=useState<{dayId:string,item:Item,index:number,total:number}|null>(null)
  const [weatherOpen,setWeatherOpen]=useState(false)
+ const [shareOpen,setShareOpen]=useState(false)
+ const [shareBusy,setShareBusy]=useState(false)
+ const [shareMessage,setShareMessage]=useState('')
+ const [draggingItem,setDraggingItem]=useState<string|null>(null)
+ const dragTimer=useRef<number|undefined>(undefined)
+ const dragPointer=useRef<number|undefined>(undefined)
  const [flightNotesCollapsed,setFlightNotesCollapsed]=useState<Record<string,boolean>>(()=>{
   try{return JSON.parse(localStorage.getItem('travel-flight-notes-collapsed')||'{}')}catch{return {}}
  })
@@ -1514,10 +1560,14 @@ function App(){
  }
  const remove=(t:Trip)=>{if(confirm(`確定刪除「${t.name}」？`)){const trips=s.trips.filter(x=>x.id!==t.id);update({...s,trips,active:s.active===t.id?(trips[0]?.id||null):s.active})}}
  const duplicate=(t:Trip)=>{const c={...structuredClone(t),id:id(),name:t.name+'（複製）',created:Date.now(),updated:Date.now()};update({...s,active:c.id,trips:[...s.trips,c]});setTab(c.days[0]?.id||null)}
- const addToCurrentDay=(x:Item)=>{if(!active)return;const target=(active.days.find(d=>d.id===tab)||active.days[0]);if(!target)return;const t={...active,days:active.days.map(d=>d.id===target.id?{...d,items:[...d.items,x]}:d),updated:Date.now()};update({...s,trips:s.trips.map(z=>z.id===t.id?t:z)});alert(`已加入 ${target.title}`)}
+ const addToCurrentDay=(x:Item)=>{if(!active)return;const target=(active.days.find(d=>d.id===tab)||active.days[0]);if(!target)return;const t={...active,days:active.days.map(d=>d.id===target.id?{...d,items:sortItemsByTime([...d.items,x])}:d),updated:Date.now()};update({...s,trips:s.trips.map(z=>z.id===t.id?t:z)});alert(`已依 ${x.start||'設定時間'} 加入 ${target.title}`)}
  const saveItem=(x:Item)=>{
   if(!active||!itemEditor)return
-  const t={...active,days:active.days.map(d=>d.id!==itemEditor.dayId?d:{...d,items:itemEditor.item?d.items.map(i=>i.id===x.id?x:i):[...d.items,x]}),updated:Date.now()}
+  const t={...active,days:active.days.map(d=>{
+   if(d.id!==itemEditor.dayId)return d
+   const items=itemEditor.item?d.items.map(i=>i.id===x.id?x:i):[...d.items,x]
+   return {...d,items:sortItemsByTime(items)}
+  }),updated:Date.now()}
   update({...s,trips:s.trips.map(z=>z.id===t.id?t:z)});setItemEditor(null)
  }
  const refreshSavedFlight=async(dayId:string,item:Item)=>{
@@ -1560,6 +1610,52 @@ function App(){
   }
  }
 
+
+ const reorderItems=(dayId:string,fromId:string,toId:string)=>{
+  if(!active||fromId===toId)return
+  const t={...active,days:active.days.map(day=>{
+   if(day.id!==dayId)return day
+   const items=[...day.items]
+   const fromIndex=items.findIndex(item=>item.id===fromId)
+   const toIndex=items.findIndex(item=>item.id===toId)
+   if(fromIndex<0||toIndex<0)return day
+   const [moved]=items.splice(fromIndex,1)
+   items.splice(toIndex,0,moved)
+   return {...day,items}
+  }),updated:Date.now()}
+  update({...s,trips:s.trips.map(trip=>trip.id===t.id?t:trip)})
+ }
+ const beginLongPress=(event:React.PointerEvent,dayId:string,itemId:string)=>{
+  if(readOnly||event.pointerType==='mouse'&&event.button!==0)return
+  dragPointer.current=event.pointerId
+  window.clearTimeout(dragTimer.current)
+  dragTimer.current=window.setTimeout(()=>{
+   setDraggingItem(itemId)
+   try{(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)}catch{}
+   if('vibrate' in navigator)navigator.vibrate?.(25)
+  },380)
+ }
+ const moveLongPress=(event:React.PointerEvent,dayId:string)=>{
+  if(!draggingItem)return
+  event.preventDefault()
+  const target=document.elementFromPoint(event.clientX,event.clientY)?.closest<HTMLElement>('[data-itinerary-item]')
+  const targetId=target?.dataset.itineraryItem
+  if(targetId&&targetId!==draggingItem)reorderItems(dayId,draggingItem,targetId)
+  const edge=70
+  if(event.clientY<edge)window.scrollBy({top:-12,behavior:'auto'})
+  else if(event.clientY>window.innerHeight-edge)window.scrollBy({top:12,behavior:'auto'})
+ }
+ const endLongPress=()=>{
+  window.clearTimeout(dragTimer.current)
+  dragTimer.current=undefined
+  if(draggingItem)setTimeout(()=>setDraggingItem(null),40)
+ }
+ const sortDayByTime=(dayId:string)=>{
+  if(!active)return
+  const t={...active,days:active.days.map(day=>day.id===dayId?{...day,items:sortItemsByTime(day.items)}:day),updated:Date.now()}
+  update({...s,trips:s.trips.map(trip=>trip.id===t.id?t:trip)})
+ }
+
  const itemAction=(dayId:string,itemId:string,action:'delete'|'copy'|'up'|'down')=>{
   if(!active)return
   const t={...active,days:active.days.map(d=>{
@@ -1578,7 +1674,81 @@ function App(){
   const t={...active,days:active.days.map(d=>d.id!==day?d:{...d,items:d.items.map(i=>i.id!==it?i:{...i,checks:i.checks?.map(c=>c.id===cid?{...c,done:!c.done}:c)})})}
   update({...s,trips:s.trips.map(z=>z.id===t.id?t:z)})
  }
- const share=async()=>{if(!active)return;const u=new URL(location.origin+location.pathname);u.searchParams.set('trip',b64(JSON.stringify(active)));if(navigator.share)await navigator.share({title:active.name,text:`查看「${active.name}」行程`,url:u.toString()});else{await navigator.clipboard.writeText(u.toString());alert('分享連結已複製')}}
+ const copyReadonlyLink=async()=>{
+  if(!active)return
+  const url=readonlyShareUrl(active)
+  await navigator.clipboard.writeText(url)
+  setShareMessage('唯讀分享連結已複製。')
+ }
+ const shareReadonlyLink=async()=>{
+  if(!active)return
+  const url=readonlyShareUrl(active)
+  try{
+   if(navigator.share)await navigator.share({title:active.name,text:`查看「${active.name}」完整旅行行程（唯讀）`,url})
+   else{await navigator.clipboard.writeText(url);setShareMessage('裝置不支援系統分享，連結已複製。')}
+  }catch(error:any){
+   if(error?.name!=='AbortError'){await navigator.clipboard.writeText(url);setShareMessage('LINE 分享未完成，唯讀連結已自動複製，可直接貼到聊天室。')}
+  }
+ }
+ const buildTripPdf=async()=>{
+  if(!active)throw new Error('找不到旅行資料')
+  const host=document.createElement('div')
+  host.className='trip-pdf-document'
+  host.innerHTML=`<header><small>TRAVEL PLANNER ULTIMATE</small><h1>${escapeHtml(active.name)}</h1><p>${escapeHtml(active.destination)}｜${escapeHtml(active.start)} ～ ${escapeHtml(active.end)}</p></header>`+
+   active.days.map((day,index)=>`<section><h2>Day ${index+1}・${escapeHtml(day.date)}・${escapeHtml(day.title)}</h2>`+
+    (day.items.length?day.items.map(item=>`<article><div class="pdf-time">${escapeHtml(item.start)}<br>～<br>${escapeHtml(item.end)}</div><div><small>${escapeHtml(typeName[item.type])}</small><h3>${escapeHtml(item.title)}</h3>${item.from||item.to?`<p>${escapeHtml(item.from||'')} → ${escapeHtml(item.to||'')}</p>`:''}${item.address?`<p>${escapeHtml(item.address)}</p>`:''}${item.note?`<p>${escapeHtml(item.note)}</p>`:''}</div></article>`).join(''):'<p>本日尚無行程</p>')+
+   `</section>`).join('')
+  document.body.appendChild(host)
+  try{
+   const [{default:html2canvas},{jsPDF}]=await Promise.all([import('html2canvas'),import('jspdf')])
+   const canvas=await html2canvas(host,{scale:1.6,useCORS:true,backgroundColor:'#ffffff'})
+   const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'})
+   const pageWidth=210,pageHeight=297
+   const imageWidth=pageWidth
+   const imageHeight=canvas.height*imageWidth/canvas.width
+   const image=canvas.toDataURL('image/jpeg',0.92)
+   let y=0
+   pdf.addImage(image,'JPEG',0,y,imageWidth,imageHeight)
+   let remaining=imageHeight-pageHeight
+   while(remaining>0){
+    y=remaining-imageHeight
+    pdf.addPage()
+    pdf.addImage(image,'JPEG',0,y,imageWidth,imageHeight)
+    remaining-=pageHeight
+   }
+   return pdf.output('blob')
+  }finally{
+   host.remove()
+  }
+ }
+ const shareTripPdf=async()=>{
+  if(!active)return
+  setShareBusy(true);setShareMessage('正在製作整份旅行 PDF…')
+  try{
+   const blob=await buildTripPdf()
+   const safeName=active.name.replace(/[\\/:*?"<>|]/g,'_')
+   const file=new File([blob],`${safeName}.pdf`,{type:'application/pdf'})
+   if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){
+    await navigator.share({title:`${active.name}旅行手冊`,text:'完整旅行 PDF',files:[file]})
+    setShareMessage('PDF 分享完成。')
+   }else{
+    const url=URL.createObjectURL(blob)
+    const anchor=document.createElement('a');anchor.href=url;anchor.download=file.name;anchor.click()
+    setTimeout(()=>URL.revokeObjectURL(url),5000)
+    setShareMessage('裝置不支援直接分享 PDF，已改為下載。')
+   }
+  }catch(error:any){
+   if(error?.name!=='AbortError')setShareMessage(`PDF 分享失敗：${error?.message||'請稍後再試'}`)
+  }finally{setShareBusy(false)}
+ }
+ const exportTripBackup=()=>{
+  if(!active)return
+  const blob=new Blob([JSON.stringify(active,null,2)],{type:'application/json'})
+  const url=URL.createObjectURL(blob)
+  const anchor=document.createElement('a');anchor.href=url;anchor.download=`${active.name.replace(/[\\/:*?"<>|]/g,'_')}.travel.json`;anchor.click()
+  setTimeout(()=>URL.revokeObjectURL(url),3000)
+ }
+ const share=()=>{setShareMessage('');setShareOpen(true)}
  const legacy=()=>{try{const old=JSON.parse(localStorage.getItem(oldKey)||'null');if(!old?.trips?.length)return alert('找不到舊版資料');const trips=old.trips.map((o:any)=>{const t=makeTrip({name:o.tripName,destination:o.destination,start:o.start,end:o.end});t.id=String(o.tripId||id());t.currency=o.currency||t.currency;t.language=o.langName||t.language;t.days=(o.days||[]).map((d:any)=>({id:String(d.id||id()),date:d.date,title:d.title,items:(d.items||[]).map((i:any)=>({id:String(i.id||id()),type:i.type==='transport'?'transport':'place',start:i.startTime||'',end:i.endTime||'',title:i.place||'',note:i.note||''}))}));return t});update({version:2,active:trips[0].id,trips});setTab(trips[0].days[0]?.id||null);alert(`已匯入 ${trips.length} 個旅行`)}catch{alert('匯入失敗')}}
 
  if(active){
@@ -1600,9 +1770,9 @@ function App(){
 
   const itinerary=<>
    <nav className="day-tabs" aria-label="每日行程分頁">{active.days.map((d,i)=><button key={d.id} className={current?.id===d.id?'active':''} onClick={()=>setTab(d.id)}><small>{d.date.slice(5)}</small><b>Day {i+1}</b></button>)}</nav>
-   {current&&<section className="card day single-day"><div className="day-head"><div><small>{new Date(current.date+'T12:00:00').toLocaleDateString('zh-TW',{weekday:'long'})}</small><h2>{current.title}・{current.date.slice(5)}</h2></div>{!readOnly&&<button className="icon" onClick={()=>setItemEditor({dayId:current.id})}><Plus/></button>}</div>
+   {current&&<section className="card day single-day"><div className="day-head"><div><small>{new Date(current.date+'T12:00:00').toLocaleDateString('zh-TW',{weekday:'long'})}</small><h2>{current.title}・{current.date.slice(5)}</h2></div>{!readOnly&&<div className="day-head-actions"><button className="icon sort-time-button" title="依時間重新排序" onClick={()=>sortDayByTime(current.id)}>↕</button><button className="icon" onClick={()=>setItemEditor({dayId:current.id})}><Plus/></button></div>}</div>
     <div className="day-summary"><span>📌 {current.items.length} 個安排</span><span>🚉 {transportCount} 段交通</span><span>⏱ {totalDuration} 分鐘通勤</span></div>
-    <div className="timeline">{current.items.length?current.items.map((i,itemIndex)=><React.Fragment key={i.id}><article className={`item ${i.type}`}><div className="time">{i.start}<span>～</span>{i.end}</div><div className="body"><div className="item-head"><div><small>{typeName[i.type].toUpperCase()}</small><h3>{i.title}</h3></div>{!readOnly&&<button className="mini-more" aria-label="更多功能" onClick={()=>setSmartMenu({dayId:current.id,item:i,index:itemIndex,total:current.items.length})}><MoreHorizontal size={18}/></button>}</div>{i.type==='transport'&&<TransportDetails item={i}/>}
+    <div className="timeline">{current.items.length?current.items.map((i,itemIndex)=><React.Fragment key={i.id}><article data-itinerary-item={i.id} className={`item ${i.type} ${draggingItem===i.id?'is-dragging':''}`} onPointerDown={event=>beginLongPress(event,current.id,i.id)} onPointerMove={event=>moveLongPress(event,current.id)} onPointerUp={endLongPress} onPointerCancel={endLongPress} onPointerLeave={()=>{if(!draggingItem)window.clearTimeout(dragTimer.current)}}><div className="time">{i.start}<span>～</span>{i.end}</div><div className="body"><div className="item-head"><div><small>{typeName[i.type].toUpperCase()}</small><h3>{i.title}</h3></div>{!readOnly&&<button className="mini-more" aria-label="更多功能" onClick={()=>setSmartMenu({dayId:current.id,item:i,index:itemIndex,total:current.items.length})}><MoreHorizontal size={18}/></button>}</div>{i.type==='transport'&&<TransportDetails item={i}/>}
 {i.type==='flight'&&<FlightCardDetails item={i} onRefresh={()=>refreshSavedFlight(current.id,i)} refreshing={refreshingFlight===i.id}/>} {(i.type==='place'||i.type==='meal'||i.type==='hotel')?<PlaceCardDetails item={i}/>:<>{i.address&&<p className="item-address"><MapPin size={14}/>{i.address}</p>}{i.openingHours&&<p className="item-hours"><Clock3 size={14}/>{i.openingHours}</p>}{i.rating!=null&&<p className="item-rating"><Star size={14}/> {i.rating}（{i.userRatingCount||0}）{i.openNow===true?'・營業中':i.openNow===false?'・目前休息':''}</p>}</>}{i.type==='flight'?(i.note||i.checks?.length)?<section className={`flight-notes-panel ${flightNotesCollapsed[i.id]?'collapsed':''}`}>
      <button type="button" className="flight-notes-toggle" onClick={()=>toggleFlightNotes(i.id)} aria-expanded={!flightNotesCollapsed[i.id]}>
       <span><StickyNote size={17}/><b>航班便條與待辦</b>{i.checks?.length?<em>{i.checks.filter(c=>!c.done).length} 項未完成</em>:i.note?<em>有便條</em>:null}</span>
@@ -1642,8 +1812,19 @@ function App(){
     {page==='more'&&<><article className="card connector-setting">
  <div><small>ITINERARY STYLE</small><h3>行程連接小插畫</h3><p>在每個行程之間顯示飛機、餐盤、地鐵等小插畫。</p></div>
  <button className={showConnectors?'toggle-switch active':'toggle-switch'} onClick={()=>{const next=!showConnectors;setShowConnectors(next);localStorage.setItem('travel-planner-show-connectors',String(next))}} aria-label="切換行程小插畫"><i/></button>
-</article><section className="tools-grid"><button className="card tool-card" onClick={()=>setForm(active)}><Palette/><b>主題風格</b><span>10 種官方主題</span></button><button className="card tool-card" onClick={()=>window.print()}><FileDown/><b>旅行手冊</b><span>列印／PDF</span></button><button className="card tool-card" onClick={()=>setFlightOpen(true)}><Plane/><b>航班中心</b><span>查詢或手動建立航班</span></button><button className="card tool-card" onClick={()=>setTransitOpen(true)}><Compass/><b>交通中心</b><span>建立地鐵、公車與步行路線</span></button><button className="card tool-card" onClick={()=>setWeatherOpen(true)}><CloudSun/><b>天氣中心</b><span>七天天氣與手動更新</span></button></section></>}
+</article><section className="tools-grid"><button className="card tool-card" onClick={()=>setForm(active)}><Palette/><b>主題風格</b><span>20 種官方主題</span></button><button className="card tool-card" onClick={()=>window.print()}><FileDown/><b>旅行手冊</b><span>列印／PDF</span></button><button className="card tool-card" onClick={()=>setFlightOpen(true)}><Plane/><b>航班中心</b><span>查詢或手動建立航班</span></button><button className="card tool-card" onClick={()=>setTransitOpen(true)}><Compass/><b>交通中心</b><span>建立地鐵、公車與步行路線</span></button><button className="card tool-card" onClick={()=>setWeatherOpen(true)}><CloudSun/><b>天氣中心</b><span>七天天氣與手動更新</span></button></section></>}
    </main>
+   {shareOpen&&<ModalShell title="分享旅行" onClose={()=>setShareOpen(false)}>
+    <section className="share-center">
+     <article className="share-intro"><Share2 size={28}/><div><h3>{active.name}</h3><p>選擇適合 iPhone、LINE 或電腦的分享方式。</p></div></article>
+     <button className="share-choice primary" onClick={shareReadonlyLink}><span>🔗</span><div><b>分享到 LINE／其他 App</b><small>傳送精簡的唯讀連結，對方可完整觀看但不能修改。</small></div></button>
+     <button className="share-choice" onClick={copyReadonlyLink}><span>📋</span><div><b>複製唯讀連結</b><small>LINE 分享中斷時，可直接貼到好友聊天室。</small></div></button>
+     <button className="share-choice yellow" disabled={shareBusy} onClick={shareTripPdf}><span>📄</span><div><b>{shareBusy?'正在製作 PDF…':'分享整份旅行 PDF'}</b><small>包含所有 Day 的行程，製作完成後再開啟 iPhone 分享選單。</small></div></button>
+     <button className="share-choice" onClick={exportTripBackup}><span>📦</span><div><b>匯出旅行備份檔</b><small>保留可再次匯入的完整旅行資料。</small></div></button>
+     <button className="share-choice" onClick={()=>window.print()}><span>🖨️</span><div><b>列印／另存 PDF</b><small>使用瀏覽器列印功能自行儲存。</small></div></button>
+     {shareMessage&&<p className="share-message">{shareMessage}</p>}
+    </section>
+   </ModalShell>}
    {weatherOpen&&<ModalShell title="天氣中心" onClose={()=>setWeatherOpen(false)}><Weather trip={active}/></ModalShell>}
    {flightOpen&&<ModalShell title="航班中心" onClose={()=>setFlightOpen(false)}><FlightCenter trip={active} onAdd={x=>{addToCurrentDay(x);setFlightOpen(false)}}/></ModalShell>}
    {transitOpen&&<ModalShell title="智慧交通中心" onClose={()=>setTransitOpen(false)}><TransitCenter trip={active} onAdd={x=>{addToCurrentDay(x);setTransitOpen(false)}}/></ModalShell>}
@@ -1654,7 +1835,7 @@ function App(){
   </div>
  }
 
- return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.0.2</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
+ return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.1.0</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
  {s.trips.length?<div className="grid">{s.trips.map(t=><article className={`trip-card theme-${t.theme}`} key={t.id}><button className="trip-cover" style={t.cover?{backgroundImage:`url(${t.cover})`}:{}} onClick={()=>{update({...s,active:t.id});setTab(t.days[0]?.id||null);setPage('home')}}><div><small>{t.country}</small><b>{t.destination}</b><span>{t.start} ～ {t.end}</span></div></button><div className="trip-info"><div><h3>{t.name}</h3><p>{t.currency}・{t.language}</p><small className="theme-name">{themes.find(x=>x.id===t.theme)?.name}</small></div><div className="icons"><button onClick={()=>setForm(t)}><Pencil size={17}/></button><button onClick={()=>duplicate(t)}><Copy size={17}/></button><button onClick={()=>remove(t)}><Trash2 size={17}/></button></div></div></article>)}</div>:<section className="card empty-home"><div>🧳</div><h2>建立第一本旅行手帳</h2><p>釜山、日本、泰國或任何目的地，都能建立獨立行程。</p><button className="btn primary" onClick={()=>setForm(true)}><Plus/>新增旅行</button><button className="btn" onClick={legacy}><Upload size={17}/>匯入舊版</button></section>}</main>
  {form&&<Form trip={form===true?undefined:form} onSave={saveTrip} onClose={()=>setForm(null)}/>}
  </div>
