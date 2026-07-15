@@ -1,5 +1,5 @@
 {
-  "name": "旅行手帳 Travel Planner Ultimate 2.9.2",
+  "name": "旅行手帳 Travel Planner Ultimate 2.9.3",
   "short_name": "旅行手帳",
   "start_url": "/",
   "display": "standalone",
@@ -20,5 +20,5 @@
       "purpose": "any maskable"
     }
   ],
-  "description": "時間框、垂直線與小插畫完全對齊的 Timeline 修正版"
+  "description": "首頁主題卡整合 7 天天氣與 Timeline 置中調整"
 }

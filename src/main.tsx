@@ -1326,14 +1326,16 @@ function App(){
    <header className="top"><button className="icon" onClick={()=>update({...s,active:null})}><ArrowLeft/></button><div><small>{readOnly?'親友唯讀行程':'旅行控制中心'}</small><h1>{active.name}</h1></div>{!readOnly&&<button className="icon" onClick={()=>setForm(active)}><Palette size={18}/></button>}</header>
    <main className="content trip page-with-nav">
     {page==='home'&&<>
-     <section className="cover" style={active.cover?{backgroundImage:`url(${active.cover})`}:{}}><div><span>{active.country}</span><h2>{active.destination}</h2><p>{active.start} ～ {active.end}</p><b>{active.currency}・{active.language}</b></div></section>
+     <section className="cover home-theme-weather" style={active.cover?{backgroundImage:`url(${active.cover})`}:{}}>
+ <div className="cover-trip-info"><span>{active.country}</span><h2>{active.destination}</h2><p>{active.start} ～ {active.end}</p><b>{active.currency}・{active.language}</b></div>
+ <Weather trip={active} compact/>
+</section>
      <section className="control-grid">
       <article className="card control-card hero-control"><small>NEXT TRIP</small><h3>{daysUntil>0?`距離出發還有 ${daysUntil} 天`:daysUntil===0?'今天出發':'旅程進行中／已完成'}</h3><div className="progress"><i style={{width:`${Math.min(100,Math.max(4,completion))}%`}}/></div><span>旅行進度 {completion}%・共 {active.days.length} Days</span></article>
       <article className="card control-card today-card"><CalendarDays size={25}/><small>TODAY PLAN</small><h3>{todayDay?`Day ${todayIndex+1}・${todayDay.date.slice(5)}`:'尚未建立日期'}</h3><span>{todayDay?.items.length||0} 個安排</span><button className="inline-link" onClick={()=>{setTab(todayDay?.id||active.days[0]?.id);setPage('itinerary')}}>查看今日行程 →</button></article>
       <article className={`card control-card flight-home-card ${nextFlightCountdown?.urgent?'urgent':''}`}><Plane size={25}/><small>最近航班</small><h3>{nextFlight?.flightNo||'尚未加入航班'}</h3><span>{nextFlight?`${nextFlight.start} → ${nextFlight.end}・${flightStatusLabel(nextFlight.flightStatus)}`:'可查詢或手動建立航班卡'}</span>{nextFlightCountdown&&<b className="home-flight-countdown">{nextFlightCountdown.label}</b>}<button className="inline-link" onClick={()=>setFlightOpen(true)}>開啟航班中心 →</button></article>
       <article className="card control-card"><WalletCards size={25}/><small>旅行錢包</small><h3>{active.currency}</h3><span>即時匯率、預算與旅伴分帳</span><button className="inline-link" onClick={()=>setPage('wallet')}>開啟旅行錢包 →</button></article>
      </section>
-     <Weather trip={active}/>
 
      {!readOnly&&<div className="quick"><button className="btn primary" onClick={share}><Share2 size={18}/>分享行程</button><button className="btn yellow" onClick={()=>window.print()}><FileDown size={18}/>列印／PDF</button></div>}
     </>}
