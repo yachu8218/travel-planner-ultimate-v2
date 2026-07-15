@@ -329,7 +329,7 @@ function Weather({trip,compact=false}:{trip:Trip,compact?:boolean}){
   try{
    const raw=JSON.parse(localStorage.getItem(WEATHER_KEY)||'{}')
    const cached=raw[cacheKey]
-   if(!force&&cached&&Date.now()-cached.updated<30*60*1000){setDays(cached.days);setUpdated(cached.updated);setLoading(false);return}
+   if(!force&&cached&&Array.isArray(cached.days)&&cached.days.length>=7&&Date.now()-cached.updated<30*60*1000){setDays(cached.days.slice(0,7));setUpdated(cached.updated);setLoading(false);return}
    const r=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${trip.lat}&longitude=${trip.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=7`)
    if(!r.ok)throw new Error()
    const j=await r.json()
@@ -338,7 +338,7 @@ function Weather({trip,compact=false}:{trip:Trip,compact?:boolean}){
    localStorage.setItem(WEATHER_KEY,JSON.stringify({...raw,[cacheKey]:{days:next,updated:now}}))
   }catch{
    const raw=JSON.parse(localStorage.getItem(WEATHER_KEY)||'{}');const cached=raw[cacheKey]
-   if(cached){setDays(cached.days);setUpdated(cached.updated);setOffline(true)}
+   if(cached&&Array.isArray(cached.days)){setDays(cached.days.slice(0,7));setUpdated(cached.updated);setOffline(true)}
   }finally{setLoading(false)}
  }
  useEffect(()=>{fetchWeather(false);const onFocus=()=>{if(!updated||Date.now()-updated>30*60*1000)fetchWeather(false)};addEventListener('focus',onFocus);return()=>removeEventListener('focus',onFocus)},[trip.id,trip.lat,trip.lon])
@@ -346,7 +346,7 @@ function Weather({trip,compact=false}:{trip:Trip,compact?:boolean}){
  return <section className={`card weather ${compact?'compact':''}`}>
   <div className="weather-head"><div><small>WEATHER</small><h3>{compact?'今日天氣':`${trip.destination} 一週天氣`}</h3></div><button className="icon refresh" onClick={()=>fetchWeather(true)} disabled={loading} aria-label="重新整理天氣"><RefreshCw size={18} className={loading?'spin':''}/></button></div>
   {first&&compact&&<div className="weather-now"><b>{wicon(first.code)}</b><strong>{first.max}°</strong><span>最低 {first.min}°・降雨 {first.rain}%</span></div>}
-  <div className={`weather-row ${compact?'mini-week':''}`}>{days.map(d=><div className="weather-day" key={d.date}><small>{new Date(d.date+'T12:00:00').toLocaleDateString('zh-TW',{weekday:'short'})}</small><b>{wicon(d.code)}</b><span>{d.max}°</span><em>{d.min}°</em><small>雨 {d.rain}%</small></div>)}</div>
+  <div className={`weather-row ${compact?'mini-week':''}`}>{days.slice(0,7).map(d=><div className="weather-day" key={d.date}><small>{new Date(d.date+'T12:00:00').toLocaleDateString('zh-TW',{weekday:'short'})}</small><b>{wicon(d.code)}</b><span>{d.max}°</span><em>{d.min}°</em><small>雨 {d.rain}%</small></div>)}</div>
   <p className="weather-status">{offline?'目前離線，使用上次資料・':''}{updated?`更新於 ${new Date(updated).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'})}`:'正在整理天氣資訊…'}</p>
  </section>
 }
@@ -355,7 +355,17 @@ function Weather({trip,compact=false}:{trip:Trip,compact?:boolean}){
 const stations=[
  ['釜山','1號線','多大浦海水浴場','다대포해수욕장','Dadaepo Beach'],['釜山','1號線','下端','하단','Hadan'],['釜山','1號線','沙上','사상','Sasang'],['釜山','1號線','釜山站','부산역','Busan Station'],['釜山','1號線','草梁','초량','Choryang'],['釜山','1號線','中央','중앙','Jungang'],['釜山','1號線','南浦','남포','Nampo'],['釜山','1號線','札嘎其','자갈치','Jagalchi'],['釜山','1號線','土城','토성','Toseong'],['釜山','1號線','西面','서면','Seomyeon'],['釜山','1號線','釜田','부전','Bujeon'],['釜山','1號線','蓮山','연산','Yeonsan'],['釜山','1號線','東萊','동래','Dongnae'],['釜山','1號線','溫泉場','온천장','Oncheonjang'],['釜山','1號線','老圃','노포','Nopo'],
  ['釜山','2號線','萇山','장산','Jangsan'],['釜山','2號線','中洞','중동','Jung-dong'],['釜山','2號線','海雲台','해운대','Haeundae'],['釜山','2號線','冬柏','동백','Dongbaek'],['釜山','2號線','Centum City','센텀시티','Centum City'],['釜山','2號線','民樂','민락','Millak'],['釜山','2號線','廣安','광안','Gwangan'],['釜山','2號線','金蓮山','금련산','Geumnyeonsan'],['釜山','2號線','慶星大釜慶大','경성대·부경대','Kyungsung Univ.'],['釜山','2號線','田浦','전포','Jeonpo'],['釜山','3號線','美南','미남','Minam'],['釜山','3號線','社稷','사직','Sajik'],['釜山','3號線','巨堤','거제','Geoje'],['釜山','東海線','新海雲台','신해운대','Sinhaeundae'],['釜山','東海線','松亭','송정','Songjeong'],['釜山','東海線','機張','기장','Gijang'],['釜山','金海輕軌','金海機場','공항','Gimhae Airport'],
- ['首爾','1號線','首爾站','서울역','Seoul Station'],['首爾','1號線','鐘路三街','종로3가','Jongno 3-ga'],['首爾','2號線','弘大入口','홍대입구','Hongik Univ.'],['首爾','2號線','乙支路入口','을지로입구','Euljiro 1-ga'],['首爾','2號線','東大門歷史文化公園','동대문역사문화공원','Dongdaemun History & Culture Park'],['首爾','2號線','聖水','성수','Seongsu'],['首爾','2號線','江南','강남','Gangnam'],['首爾','3號線','景福宮','경복궁','Gyeongbokgung'],['首爾','4號線','明洞','명동','Myeong-dong'],['首爾','6號線','梨泰院','이태원','Itaewon'],['首爾','機場鐵路','仁川機場第一航廈','인천공항1터미널','Incheon Airport T1'],['首爾','機場鐵路','仁川機場第二航廈','인천공항2터미널','Incheon Airport T2'],
+
+ ['首爾','1號線','逍遙山','소요산','Soyosan'],['首爾','1號線','東豆川','동두천','Dongducheon'],['首爾','1號線','議政府','의정부','Uijeongbu'],['首爾','1號線','道峰山','도봉산','Dobongsan'],['首爾','1號線','倉洞','창동','Chang-dong'],['首爾','1號線','光云大','광운대','Kwangwoon Univ.'],['首爾','1號線','清涼里','청량리','Cheongnyangni'],['首爾','1號線','東廟前','동묘앞','Dongmyo'],['首爾','1號線','東大門','동대문','Dongdaemun'],['首爾','1號線','鐘路五街','종로5가','Jongno 5-ga'],['首爾','1號線','鐘路三街','종로3가','Jongno 3-ga'],['首爾','1號線','鐘閣','종각','Jonggak'],['首爾','1號線','市廳','시청','City Hall'],['首爾','1號線','首爾站','서울역','Seoul Station'],['首爾','1號線','龍山','용산','Yongsan'],['首爾','1號線','鷺梁津','노량진','Noryangjin'],['首爾','1號線','新道林','신도림','Sindorim'],['首爾','1號線','九老','구로','Guro'],['首爾','1號線','加山數碼園區','가산디지털단지','Gasan Digital Complex'],['首爾','1號線','衿井','금정','Geumjeong'],['首爾','1號線','水原','수원','Suwon'],['首爾','1號線','仁川','인천','Incheon'],
+ ['首爾','2號線','市廳','시청','City Hall'],['首爾','2號線','乙支路入口','을지로입구','Euljiro 1-ga'],['首爾','2號線','乙支路三街','을지로3가','Euljiro 3-ga'],['首爾','2號線','乙支路四街','을지로4가','Euljiro 4-ga'],['首爾','2號線','東大門歷史文化公園','동대문역사문화공원','Dongdaemun History & Culture Park'],['首爾','2號線','新堂','신당','Sindang'],['首爾','2號線','往十里','왕십리','Wangsimni'],['首爾','2號線','漢陽大','한양대','Hanyang Univ.'],['首爾','2號線','纛島','뚝섬','Ttukseom'],['首爾','2號線','聖水','성수','Seongsu'],['首爾','2號線','建大入口','건대입구','Konkuk Univ.'],['首爾','2號線','九宜','구의','Guui'],['首爾','2號線','江邊','강변','Gangbyeon'],['首爾','2號線','蠶室渡口','잠실나루','Jamsillaru'],['首爾','2號線','蠶室','잠실','Jamsil'],['首爾','2號線','蠶室新川','잠실새내','Jamsilsaenae'],['首爾','2號線','綜合運動場','종합운동장','Sports Complex'],['首爾','2號線','三成','삼성','Samseong'],['首爾','2號線','宣陵','선릉','Seolleung'],['首爾','2號線','驛三','역삼','Yeoksam'],['首爾','2號線','江南','강남','Gangnam'],['首爾','2號線','教大','교대','Seoul Natl Univ. of Education'],['首爾','2號線','瑞草','서초','Seocho'],['首爾','2號線','方背','방배','Bangbae'],['首爾','2號線','舍堂','사당','Sadang'],['首爾','2號線','落星垈','낙성대','Nakseongdae'],['首爾','2號線','首爾大入口','서울대입구','Seoul Natl Univ.'],['首爾','2號線','奉天','봉천','Bongcheon'],['首爾','2號線','新林','신림','Sillim'],['首爾','2號線','新大方','신대방','Sindaebang'],['首爾','2號線','九老數碼園區','구로디지털단지','Guro Digital Complex'],['首爾','2號線','大林','대림','Daerim'],['首爾','2號線','新道林','신도림','Sindorim'],['首爾','2號線','文來','문래','Mullae'],['首爾','2號線','永登浦區廳','영등포구청','Yeongdeungpo-gu Office'],['首爾','2號線','堂山','당산','Dangsan'],['首爾','2號線','合井','합정','Hapjeong'],['首爾','2號線','弘大入口','홍대입구','Hongik Univ.'],['首爾','2號線','新村','신촌','Sinchon'],['首爾','2號線','梨大','이대','Ewha Womans Univ.'],['首爾','2號線','阿峴','아현','Ahyeon'],['首爾','2號線','忠正路','충정로','Chungjeongno'],
+ ['首爾','3號線','大化','대화','Daehwa'],['首爾','3號線','注葉','주엽','Juyeop'],['首爾','3號線','鼎鉢山','정발산','Jeongbalsan'],['首爾','3號線','白石','백석','Baekseok'],['首爾','3號線','花井','화정','Hwajeong'],['首爾','3號線','延新川','연신내','Yeonsinnae'],['首爾','3號線','佛光','불광','Bulgwang'],['首爾','3號線','弘濟','홍제','Hongje'],['首爾','3號線','獨立門','독립문','Dongnimmun'],['首爾','3號線','景福宮','경복궁','Gyeongbokgung'],['首爾','3號線','安國','안국','Anguk'],['首爾','3號線','鐘路三街','종로3가','Jongno 3-ga'],['首爾','3號線','乙支路三街','을지로3가','Euljiro 3-ga'],['首爾','3號線','忠武路','충무로','Chungmuro'],['首爾','3號線','東大入口','동대입구','Dongguk Univ.'],['首爾','3號線','藥水','약수','Yaksu'],['首爾','3號線','金湖','금호','Geumho'],['首爾','3號線','玉水','옥수','Oksu'],['首爾','3號線','狎鷗亭','압구정','Apgujeong'],['首爾','3號線','新沙','신사','Sinsa'],['首爾','3號線','蠶院','잠원','Jamwon'],['首爾','3號線','高速巴士客運站','고속터미널','Express Bus Terminal'],['首爾','3號線','教大','교대','Seoul Natl Univ. of Education'],['首爾','3號線','南部客運站','남부터미널','Nambu Bus Terminal'],['首爾','3號線','良才','양재','Yangjae'],['首爾','3號線','道谷','도곡','Dogok'],['首爾','3號線','大峙','대치','Daechi'],['首爾','3號線','鶴灘','학여울','Hangnyeoul'],['首爾','3號線','大廳','대청','Daecheong'],['首爾','3號線','逸院','일원','Irwon'],['首爾','3號線','水西','수서','Suseo'],['首爾','3號線','可樂市場','가락시장','Garak Market'],['首爾','3號線','警察醫院','경찰병원','National Police Hospital'],['首爾','3號線','梧琴','오금','Ogeum'],
+ ['首爾','4號線','榛接','진접','Jinjeop'],['首爾','4號線','別內星江','별내별가람','Byeollae Byeolgaram'],['首爾','4號線','堂嶺','당고개','Danggogae'],['首爾','4號線','蘆原','노원','Nowon'],['首爾','4號線','倉洞','창동','Chang-dong'],['首爾','4號線','雙門','쌍문','Ssangmun'],['首爾','4號線','水踰','수유','Suyu'],['首爾','4號線','彌阿','미아','Mia'],['首爾','4號線','吉音','길음','Gireum'],['首爾','4號線','誠信女大入口','성신여대입구','Sungshin Women’s Univ.'],['首爾','4號線','漢城大入口','한성대입구','Hansung Univ.'],['首爾','4號線','惠化','혜화','Hyehwa'],['首爾','4號線','東大門','동대문','Dongdaemun'],['首爾','4號線','東大門歷史文化公園','동대문역사문화공원','Dongdaemun History & Culture Park'],['首爾','4號線','忠武路','충무로','Chungmuro'],['首爾','4號線','明洞','명동','Myeong-dong'],['首爾','4號線','會賢','회현','Hoehyeon'],['首爾','4號線','首爾站','서울역','Seoul Station'],['首爾','4號線','淑大入口','숙대입구','Sookmyung Women’s Univ.'],['首爾','4號線','三角地','삼각지','Samgakji'],['首爾','4號線','新龍山','신용산','Sinyongsan'],['首爾','4號線','二村','이촌','Ichon'],['首爾','4號線','銅雀','동작','Dongjak'],['首爾','4號線','總神大入口','총신대입구','Chongshin Univ.'],['首爾','4號線','舍堂','사당','Sadang'],['首爾','4號線','南泰嶺','남태령','Namtaeryeong'],['首爾','4號線','衿井','금정','Geumjeong'],['首爾','4號線','安山','안산','Ansan'],['首爾','4號線','烏耳島','오이도','Oido'],
+ ['首爾','5號線','傍花','방화','Banghwa'],['首爾','5號線','金浦機場','김포공항','Gimpo Airport'],['首爾','5號線','松亭','송정','Songjeong'],['首爾','5號線','缽山','발산','Balsan'],['首爾','5號線','禾谷','화곡','Hwagok'],['首爾','5號線','喜鵲山','까치산','Kkachisan'],['首爾','5號線','木洞','목동','Mok-dong'],['首爾','5號線','梧木橋','오목교','Omokgyo'],['首爾','5號線','永登浦區廳','영등포구청','Yeongdeungpo-gu Office'],['首爾','5號線','汝矣島','여의도','Yeouido'],['首爾','5號線','麻浦','마포','Mapo'],['首爾','5號線','孔德','공덕','Gongdeok'],['首爾','5號線','忠正路','충정로','Chungjeongno'],['首爾','5號線','西大門','서대문','Seodaemun'],['首爾','5號線','光化門','광화문','Gwanghwamun'],['首爾','5號線','鐘路三街','종로3가','Jongno 3-ga'],['首爾','5號線','乙支路四街','을지로4가','Euljiro 4-ga'],['首爾','5號線','東大門歷史文化公園','동대문역사문화공원','Dongdaemun History & Culture Park'],['首爾','5號線','往十里','왕십리','Wangsimni'],['首爾','5號線','君子','군자','Gunja'],['首爾','5號線','峨嵯山','아차산','Achasan'],['首爾','5號線','千戶','천호','Cheonho'],['首爾','5號線','江東','강동','Gangdong'],['首爾','5號線','奧林匹克公園','올림픽공원','Olympic Park'],['首爾','5號線','梧琴','오금','Ogeum'],['首爾','5號線','河南市廳','하남시청','Hanam City Hall'],
+ ['首爾','6號線','鷹岩','응암','Eungam'],['首爾','6號線','延新川','연신내','Yeonsinnae'],['首爾','6號線','佛光','불광','Bulgwang'],['首爾','6號線','數碼媒體城','디지털미디어시티','Digital Media City'],['首爾','6號線','世界盃競技場','월드컵경기장','World Cup Stadium'],['首爾','6號線','合井','합정','Hapjeong'],['首爾','6號線','上水','상수','Sangsu'],['首爾','6號線','廣興倉','광흥창','Gwangheungchang'],['首爾','6號線','大興','대흥','Daeheung'],['首爾','6號線','孔德','공덕','Gongdeok'],['首爾','6號線','孝昌公園前','효창공원앞','Hyochang Park'],['首爾','6號線','三角地','삼각지','Samgakji'],['首爾','6號線','綠莎坪','녹사평','Noksapyeong'],['首爾','6號線','梨泰院','이태원','Itaewon'],['首爾','6號線','漢江鎮','한강진','Hangangjin'],['首爾','6號線','藥水','약수','Yaksu'],['首爾','6號線','新堂','신당','Sindang'],['首爾','6號線','東廟前','동묘앞','Dongmyo'],['首爾','6號線','普門','보문','Bomun'],['首爾','6號線','高麗大','고려대','Korea Univ.'],['首爾','6號線','石溪','석계','Seokgye'],['首爾','6號線','泰陵入口','태릉입구','Taereung'],['首爾','6號線','烽火山','봉화산','Bonghwasan'],['首爾','6號線','新內','신내','Sinnae'],
+ ['首爾','7號線','長岩','장암','Jangam'],['首爾','7號線','道峰山','도봉산','Dobongsan'],['首爾','7號線','蘆原','노원','Nowon'],['首爾','7號線','上鳳','상봉','Sangbong'],['首爾','7號線','君子','군자','Gunja'],['首爾','7號線','建大入口','건대입구','Konkuk Univ.'],['首爾','7號線','清潭','청담','Cheongdam'],['首爾','7號線','江南區廳','강남구청','Gangnam-gu Office'],['首爾','7號線','鶴洞','학동','Hak-dong'],['首爾','7號線','論峴','논현','Nonhyeon'],['首爾','7號線','高速巴士客運站','고속터미널','Express Bus Terminal'],['首爾','7號線','內方','내방','Naebang'],['首爾','7號線','總神大入口','총신대입구','Chongshin Univ.'],['首爾','7號線','南城','남성','Namseong'],['首爾','7號線','崇實大入口','숭실대입구','Soongsil Univ.'],['首爾','7號線','上道','상도','Sangdo'],['首爾','7號線','新大方三叉路口','신대방삼거리','Sindaebang Samgeori'],['首爾','7號線','大林','대림','Daerim'],['首爾','7號線','加山數碼園區','가산디지털단지','Gasan Digital Complex'],['首爾','7號線','溫水','온수','Onsu'],['首爾','7號線','富平區廳','부평구청','Bupyeong-gu Office'],['首爾','7號線','石南','석남','Seongnam'],
+ ['首爾','8號線','別內','별내','Byeollae'],['首爾','8號線','岩寺','암사','Amsa'],['首爾','8號線','千戶','천호','Cheonho'],['首爾','8號線','江東區廳','강동구청','Gangdong-gu Office'],['首爾','8號線','夢村土城','몽촌토성','Mongchontoseong'],['首爾','8號線','蠶室','잠실','Jamsil'],['首爾','8號線','石村','석촌','Seokchon'],['首爾','8號線','松坡','송파','Songpa'],['首爾','8號線','可樂市場','가락시장','Garak Market'],['首爾','8號線','文井','문정','Munjeong'],['首爾','8號線','長旨','장지','Jangji'],['首爾','8號線','福井','복정','Bokjeong'],['首爾','8號線','牡丹','모란','Moran'],
+ ['首爾','9號線','開花','개화','Gaehwa'],['首爾','9號線','金浦機場','김포공항','Gimpo Airport'],['首爾','9號線','麻谷渡口','마곡나루','Magongnaru'],['首爾','9號線','加陽','가양','Gayang'],['首爾','9號線','鹽倉','염창','Yeomchang'],['首爾','9號線','堂山','당산','Dangsan'],['首爾','9號線','國會議事堂','국회의사당','National Assembly'],['首爾','9號線','汝矣島','여의도','Yeouido'],['首爾','9號線','鷺梁津','노량진','Noryangjin'],['首爾','9號線','銅雀','동작','Dongjak'],['首爾','9號線','高速巴士客運站','고속터미널','Express Bus Terminal'],['首爾','9號線','新論峴','신논현','Sinnonhyeon'],['首爾','9號線','彥州','언주','Eonju'],['首爾','9號線','宣靖陵','선정릉','Seonjeongneung'],['首爾','9號線','奉恩寺','봉은사','Bongeunsa'],['首爾','9號線','綜合運動場','종합운동장','Sports Complex'],['首爾','9號線','石村古墳','석촌고분','Seokchon Gobun'],['首爾','9號線','石村','석촌','Seokchon'],['首爾','9號線','奧林匹克公園','올림픽공원','Olympic Park'],['首爾','9號線','中央報勳醫院','중앙보훈병원','VHS Medical Center'],
+ ['首爾','機場鐵路','仁川機場第二航廈','인천공항2터미널','Incheon Airport T2'],['首爾','機場鐵路','仁川機場第一航廈','인천공항1터미널','Incheon Airport T1'],['首爾','機場鐵路','雲西','운서','Unseo'],['首爾','機場鐵路','青羅國際城','청라국제도시','Cheongna Int’l City'],['首爾','機場鐵路','桂陽','계양','Gyeyang'],['首爾','機場鐵路','金浦機場','김포공항','Gimpo Airport'],['首爾','機場鐵路','數碼媒體城','디지털미디어시티','Digital Media City'],['首爾','機場鐵路','弘大入口','홍대입구','Hongik Univ.'],['首爾','機場鐵路','孔德','공덕','Gongdeok'],['首爾','機場鐵路','首爾站','서울역','Seoul Station'],
  ['東京','JR山手線','東京','東京','Tokyo'],['東京','JR山手線','上野','上野','Ueno'],['東京','JR山手線','秋葉原','秋葉原','Akihabara'],['東京','JR山手線','新宿','新宿','Shinjuku'],['東京','JR山手線','澀谷','渋谷','Shibuya'],['東京','JR山手線','池袋','池袋','Ikebukuro'],['東京','銀座線','淺草','浅草','Asakusa'],['東京','銀座線','銀座','銀座','Ginza'],['東京','機場線','羽田機場第三航廈','羽田空港第3ターミナル','Haneda Airport T3'],
  ['大阪','御堂筋線','梅田','梅田','Umeda'],['大阪','御堂筋線','心齋橋','心斎橋','Shinsaibashi'],['大阪','御堂筋線','難波','なんば','Namba'],['大阪','御堂筋線','天王寺','天王寺','Tennoji'],['大阪','JR','大阪','大阪','Osaka'],['大阪','JR','環球影城','ユニバーサルシティ','Universal City'],['大阪','南海線','關西機場','関西空港','Kansai Airport'],
  ['京都','JR','京都','京都','Kyoto'],['京都','阪急京都線','京都河原町','京都河原町','Kyoto-kawaramachi'],['京都','京阪本線','祇園四條','祇園四条','Gion-shijo'],['京都','JR奈良線','稻荷','稲荷','Inari'],['福岡','機場線','福岡機場','福岡空港','Fukuoka Airport'],['福岡','機場線','博多','博多','Hakata'],['福岡','機場線','天神','天神','Tenjin']
@@ -378,12 +388,16 @@ const metroLines:Record<string,Record<string,string[]>>={
   '金海輕軌':['沙上','金海機場']
  },
  '首爾':{
-  '1號線':['首爾站','鐘路三街'],
-  '2號線':['弘大入口','乙支路入口','東大門歷史文化公園','聖水','江南'],
-  '3號線':['景福宮','鐘路三街'],
-  '4號線':['首爾站','明洞','東大門歷史文化公園'],
-  '6號線':['梨泰院'],
-  '機場鐵路':['仁川機場第二航廈','仁川機場第一航廈','弘大入口','首爾站']
+  '1號線':['逍遙山','東豆川','議政府','道峰山','倉洞','光云大','清涼里','東廟前','東大門','鐘路五街','鐘路三街','鐘閣','市廳','首爾站','龍山','鷺梁津','新道林','九老','加山數碼園區','衿井','水原','仁川'],
+  '2號線':['市廳','乙支路入口','乙支路三街','乙支路四街','東大門歷史文化公園','新堂','往十里','漢陽大','纛島','聖水','建大入口','九宜','江邊','蠶室渡口','蠶室','蠶室新川','綜合運動場','三成','宣陵','驛三','江南','教大','瑞草','方背','舍堂','落星垈','首爾大入口','奉天','新林','新大方','九老數碼園區','大林','新道林','文來','永登浦區廳','堂山','合井','弘大入口','新村','梨大','阿峴','忠正路'],
+  '3號線':['大化','注葉','鼎鉢山','白石','花井','延新川','佛光','弘濟','獨立門','景福宮','安國','鐘路三街','乙支路三街','忠武路','東大入口','藥水','金湖','玉水','狎鷗亭','新沙','蠶院','高速巴士客運站','教大','南部客運站','良才','道谷','大峙','鶴灘','大廳','逸院','水西','可樂市場','警察醫院','梧琴'],
+  '4號線':['榛接','別內星江','堂嶺','蘆原','倉洞','雙門','水踰','彌阿','吉音','誠信女大入口','漢城大入口','惠化','東大門','東大門歷史文化公園','忠武路','明洞','會賢','首爾站','淑大入口','三角地','新龍山','二村','銅雀','總神大入口','舍堂','南泰嶺','衿井','安山','烏耳島'],
+  '5號線':['傍花','金浦機場','松亭','缽山','禾谷','喜鵲山','木洞','梧木橋','永登浦區廳','汝矣島','麻浦','孔德','忠正路','西大門','光化門','鐘路三街','乙支路四街','東大門歷史文化公園','往十里','君子','峨嵯山','千戶','江東','奧林匹克公園','梧琴','河南市廳'],
+  '6號線':['鷹岩','延新川','佛光','數碼媒體城','世界盃競技場','合井','上水','廣興倉','大興','孔德','孝昌公園前','三角地','綠莎坪','梨泰院','漢江鎮','藥水','新堂','東廟前','普門','高麗大','石溪','泰陵入口','烽火山','新內'],
+  '7號線':['長岩','道峰山','蘆原','上鳳','君子','建大入口','清潭','江南區廳','鶴洞','論峴','高速巴士客運站','內方','總神大入口','南城','崇實大入口','上道','新大方三叉路口','大林','加山數碼園區','溫水','富平區廳','石南'],
+  '8號線':['別內','岩寺','千戶','江東區廳','夢村土城','蠶室','石村','松坡','可樂市場','文井','長旨','福井','牡丹'],
+  '9號線':['開花','金浦機場','麻谷渡口','加陽','鹽倉','堂山','國會議事堂','汝矣島','鷺梁津','銅雀','高速巴士客運站','新論峴','彥州','宣靖陵','奉恩寺','綜合運動場','石村古墳','石村','奧林匹克公園','中央報勳醫院'],
+  '機場鐵路':['仁川機場第二航廈','仁川機場第一航廈','雲西','青羅國際城','桂陽','金浦機場','數碼媒體城','弘大入口','孔德','首爾站']
  },
  '東京':{
   'JR山手線':['東京','秋葉原','上野','池袋','新宿','澀谷'],
@@ -452,18 +466,26 @@ const calculateMetroRoute=(from:MetroStation,to:MetroStation):MetroRouteResult|n
   if(!adjacency.has(k))adjacency.set(k,[])
   adjacency.get(k)!.push({state:b,cost})
  }
+ const rideMinutes=(line:string)=>{
+  if(line==='機場鐵路')return 5
+  if(line==='東海線'||line==='金海輕軌')return 4
+  if(line==='1號線'||line==='4號線')return 3
+  if(line==='9號線')return 2.4
+  return 2.2
+ }
  Object.entries(lines).forEach(([line,list])=>{
   list.forEach((station,i)=>{
    if(i<list.length-1){
     const a={station,line},b={station:list[i+1],line}
-    add(a,b,3);add(b,a,3)
+    const minutes=rideMinutes(line)
+    add(a,b,minutes);add(b,a,minutes)
    }
   })
  })
  const byStation=new Map<string,State[]>()
  states.forEach(s=>byStation.set(s.station,[...(byStation.get(s.station)||[]),s]))
  byStation.forEach(group=>{
-  group.forEach(a=>group.forEach(b=>{if(a.line!==b.line)add(a,b,6)}))
+  group.forEach(a=>group.forEach(b=>{if(a.line!==b.line)add(a,b,city==='首爾'?5:4)}))
  })
 
  const starts=states.filter(s=>s.station===from[2])
@@ -510,7 +532,8 @@ const calculateMetroRoute=(from:MetroStation,to:MetroStation):MetroRouteResult|n
    }
 
    const transfers=Math.max(0,segments.length-1)
-   const minutes=Math.max(4,current.distance+4)
+   const baseWait=city==='首爾'?4:3
+   const minutes=Math.max(4,Math.round(current.distance+baseWait))
    const fareInfo=metroFare(city,totalStations)
    return {city,from,to,minutes,stations:totalStations,transfers,segments,...fareInfo}
   }
@@ -866,7 +889,7 @@ function ExploreCenter({trip,onAdd,onFavorite,onRemoveFavorite}:{trip:Trip,onAdd
     {metroRoute&&<article className="metro-route-result">
      <header>
       <div><small>ROUTE RESULT</small><h3>{metroRoute.from[2]} → {metroRoute.to[2]}</h3></div>
-      <strong>{metroRoute.minutes} 分鐘</strong>
+      <strong>約 {metroRoute.minutes} 分鐘</strong>
      </header>
      <div className="metro-summary">
       <span><b>{metroRoute.stations}</b>站</span>
@@ -880,7 +903,7 @@ function ExploreCenter({trip,onAdd,onFavorite,onRemoveFavorite}:{trip:Trip,onAdd
       <div><b>{segment.from}</b><i>↓ 搭乘 {segment.stops} 站</i><b>{segment.to}</b></div>
       {index<metroRoute.segments.length-1&&<em>轉乘</em>}
      </div>)}</div>
-     <p className="metro-estimate-note">時間與票價為行程規劃估算，實際班距、轉乘步行及票價請以當地交通資訊為準。</p>
+     <p className="metro-estimate-note">時間與票價為路線規劃估算，實際班距、轉乘步行及票價請以當地交通資訊為準。</p>
      <div className="metro-result-actions">
       <a className="btn" target="_blank" rel="noreferrer" href={gmap(`${metroRoute.from[4]} Station to ${metroRoute.to[4]} Station transit`)}>Google Maps</a>
       {metroRoute.city==='釜山'&&<a className="btn" target="_blank" rel="noreferrer" href={nmap(`${metroRoute.from[3]} ${metroRoute.to[3]} 지하철`)}>Naver Map</a>}
@@ -1352,13 +1375,13 @@ function FlightCardDetails({item,onRefresh,refreshing}:{item:Item;onRefresh?:()=
    <div>
     <b>{depCode}</b>
     <strong>{item.start}</strong>
-    <small>{terminalLabel(item.departureTerminal)}{item.departureGate?`・Gate ${item.departureGate}`:'・Gate 待公布'}</small><em>{offsetLabel(item.departureUtcOffset)||item.departureTimezone||''}</em>
+    <em>{offsetLabel(item.departureUtcOffset)||item.departureTimezone||''}</em>
    </div>
    <div className="saved-flight-path"><Plane size={20}/><span>{item.durationMin?`${Math.floor(item.durationMin/60)}小時${item.durationMin%60}分`:''}</span></div>
    <div>
     <b>{arrCode}</b>
     <strong>{item.end}</strong>
-    <small>{terminalLabel(item.arrivalTerminal)}{item.baggageBelt?`・行李 ${item.baggageBelt}`:'・行李待公布'}</small><em>{offsetLabel(item.arrivalUtcOffset)||item.arrivalTimezone||''}</em>
+    <em>{offsetLabel(item.arrivalUtcOffset)||item.arrivalTimezone||''}</em>
    </div>
   </div>
   <div className="saved-flight-info compact-info">
@@ -1612,7 +1635,7 @@ function App(){
   </div>
  }
 
- return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 2.3.0</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
+ return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.0.1</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
  {s.trips.length?<div className="grid">{s.trips.map(t=><article className={`trip-card theme-${t.theme}`} key={t.id}><button className="trip-cover" style={t.cover?{backgroundImage:`url(${t.cover})`}:{}} onClick={()=>{update({...s,active:t.id});setTab(t.days[0]?.id||null);setPage('home')}}><div><small>{t.country}</small><b>{t.destination}</b><span>{t.start} ～ {t.end}</span></div></button><div className="trip-info"><div><h3>{t.name}</h3><p>{t.currency}・{t.language}</p><small className="theme-name">{themes.find(x=>x.id===t.theme)?.name}</small></div><div className="icons"><button onClick={()=>setForm(t)}><Pencil size={17}/></button><button onClick={()=>duplicate(t)}><Copy size={17}/></button><button onClick={()=>remove(t)}><Trash2 size={17}/></button></div></div></article>)}</div>:<section className="card empty-home"><div>🧳</div><h2>建立第一本旅行手帳</h2><p>釜山、日本、泰國或任何目的地，都能建立獨立行程。</p><button className="btn primary" onClick={()=>setForm(true)}><Plus/>新增旅行</button><button className="btn" onClick={legacy}><Upload size={17}/>匯入舊版</button></section>}</main>
  {form&&<Form trip={form===true?undefined:form} onSave={saveTrip} onClose={()=>setForm(null)}/>}
  </div>
