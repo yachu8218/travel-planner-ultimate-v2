@@ -1867,3 +1867,64 @@ form select{
  .theme-grid{grid-template-columns:1fr 1fr}
  .share-choice{grid-template-columns:36px minmax(0,1fr);padding:11px}
 }
+
+/* =========================================================
+   v3.2.0 — Short readonly sharing
+   ========================================================= */
+.share-expiry{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:10px;
+  padding:11px 12px;
+  border:2px solid var(--ink);
+  border-radius:10px;
+  background:var(--paper);
+  font-size:12px;
+  font-weight:900;
+}
+.share-expiry select{
+  min-width:100px;
+  box-shadow:none!important;
+}
+.short-share-preview{
+  display:grid;
+  gap:5px;
+  padding:12px;
+  border:2px dashed var(--accent);
+  border-radius:10px;
+  background:color-mix(in srgb,var(--soft) 72%,white);
+}
+.short-share-preview small{
+  font-size:9px;
+}
+.short-share-preview strong{
+  overflow-wrap:anywhere;
+  font-size:13px;
+}
+.short-share-preview span{
+  font-size:9px;
+  color:#5f6b68;
+}
+.shared-loading-screen{
+  min-height:100vh;
+  display:grid;
+  place-items:center;
+  padding:22px;
+  background:var(--page,#fff8e8);
+}
+.shared-loading-card{
+  width:min(100%,430px);
+  display:grid;
+  justify-items:center;
+  gap:9px;
+  padding:28px!important;
+  text-align:center;
+}
+.shared-loading-icon{
+  font-size:48px;
+}
+.shared-loading-card h1,
+.shared-loading-card p{
+  margin:2px 0;
+}

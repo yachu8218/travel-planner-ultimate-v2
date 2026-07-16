@@ -1,19 +1,17 @@
-# Travel Planner Ultimate v3.1.2
+# Travel Planner Ultimate v3.2.1
 
-本版專門修正 Cloudflare Pages 的 npm 建置問題。
+## 修正
+- 修復 `index.html` 被程式內容覆蓋造成的 Vite HTML parse error。
+- 保留 Cloudflare KV 唯讀短網址功能。
+- 保留 v3.1.1 已成功的 pnpm 建置方式。
 
-## GitHub 請確認
-- package-lock.json 已上傳
-- package.json 已覆蓋
-- .npmrc 已上傳
-- .node-version 已上傳
-- 沒有 pnpm-lock.yaml
+## Cloudflare Build
+- Build command：`npm run build`
+- Build output：`dist`
+- NODE_VERSION：`20.19.4`
 
-## Cloudflare
-Build command：npm run build
-Build output directory：dist
-NODE_VERSION：20.19.4
+Cloudflare 會依 `packageManager` 自動使用 pnpm。
 
-若 Cloudflare 平台仍出現 `Exit handler never called!`，可改用：
-SKIP_DEPENDENCY_INSTALL=1
-Build command：npm install --no-audit --no-fund --progress=false && npm run build
+## KV
+Pages → Settings → Bindings → KV namespace
+Variable name：`TRIP_SHARES`

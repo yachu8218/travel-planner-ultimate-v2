@@ -98,7 +98,9 @@ const load=():State=>{try{const s=JSON.parse(localStorage.getItem(KEY)||'null');
 const save=(s:State)=>localStorage.setItem(KEY,JSON.stringify(s))
 const b64=(s:string)=>btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
 const ub64=(s:string)=>decodeURIComponent(escape(atob(s.replace(/-/g,'+').replace(/_/g,'/').padEnd(Math.ceil(s.length/4)*4,'='))))
-const shared=(()=>{const params=new URLSearchParams(location.search);const compact=params.get('share');const legacy=params.get('trip');try{if(compact){const raw=decompressFromEncodedURIComponent(compact);return raw?normalizeTrip(JSON.parse(raw)):null}if(legacy)return normalizeTrip(JSON.parse(ub64(legacy)))}catch{}return null})()
+const shareParams=new URLSearchParams(location.search)
+const shortShareCode=shareParams.get('shareId')
+const legacyShared=(()=>{const compact=shareParams.get('share');const legacy=shareParams.get('trip');try{if(compact){const raw=decompressFromEncodedURIComponent(compact);return raw?normalizeTrip(JSON.parse(raw)):null}if(legacy)return normalizeTrip(JSON.parse(ub64(legacy)))}catch{}return null})()
 const wicon=(c:number)=>c===0?'☀️':c<=3?'⛅':c<=48?'🌫️':c<=67?'🌧️':c<=77?'❄️':c<=82?'🌦️':'⛈️'
 const modeLabel:Record<TransportMode,string>={walk:'步行',metro:'地鐵',bus:'公車',taxi:'計程車',car:'自駕／租車',train:'火車／高鐵／KTX',flight:'飛機',ferry:'渡輪'}
 const modeEmoji:Record<TransportMode,string>={walk:'🚶',metro:'🚇',bus:'🚌',taxi:'🚕',car:'🚗',train:'🚄',flight:'✈️',ferry:'⛴️'}
@@ -126,7 +128,7 @@ const compactReadonlyTrip=(trip:Trip):Trip=>({
  }))}))
 })
 const escapeHtml=(value:any)=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]||ch))
-const readonlyShareUrl=(trip:Trip)=>{
+const legacyReadonlyShareUrl=(trip:Trip)=>{
  const url=new URL(location.origin+location.pathname)
  url.searchParams.set('share',compressToEncodedURIComponent(JSON.stringify(compactReadonlyTrip(trip))))
  return url.toString()
@@ -1496,8 +1498,12 @@ function ComingPage({icon,title,children}:{icon:React.ReactNode,title:string,chi
 }
 
 function App(){
- const readOnly=!!shared
- const [s,setS]=useState<State>(()=>shared?{version:2,active:shared.id,trips:[shared]}:load())
+ const [remoteShared,setRemoteShared]=useState<Trip|null>(null)
+ const [shareLoadError,setShareLoadError]=useState('')
+ const [shareLoadNonce,setShareLoadNonce]=useState(0)
+ const sharedTrip=legacyShared||remoteShared
+ const readOnly=!!sharedTrip||!!shortShareCode
+ const [s,setS]=useState<State>(()=>legacyShared?{version:2,active:legacyShared.id,trips:[legacyShared]}:load())
  const [form,setForm]=useState<Trip|true|null>(null)
  const [itemEditor,setItemEditor]=useState<{dayId:string,item?:Item}|null>(null)
  const [tab,setTab]=useState<string|null>(null)
@@ -1509,6 +1515,8 @@ function App(){
  const [shareOpen,setShareOpen]=useState(false)
  const [shareBusy,setShareBusy]=useState(false)
  const [shareMessage,setShareMessage]=useState('')
+ const [shortShareUrl,setShortShareUrl]=useState('')
+ const [shareExpiryDays,setShareExpiryDays]=useState(30)
  const [draggingItem,setDraggingItem]=useState<string|null>(null)
  const dragTimer=useRef<number|undefined>(undefined)
  const dragPointer=useRef<number|undefined>(undefined)
@@ -1549,7 +1557,26 @@ function App(){
   else addFavorite(item)
  }
 
+ useEffect(()=>{
+  if(!shortShareCode)return
+  let cancelled=false
+  setShareLoadError('')
+  fetch(`/api/share/${encodeURIComponent(shortShareCode)}`)
+   .then(async response=>{
+    if(!response.ok){const body=await response.json().catch(()=>({}));throw new Error(body.error||'找不到這個分享行程')}
+    return response.json()
+   })
+   .then(payload=>{
+    if(cancelled)return
+    const trip=normalizeTrip(payload.trip)
+    setRemoteShared(trip)
+    setS({version:2,active:trip.id,trips:[trip]})
+   })
+   .catch(error=>{if(!cancelled)setShareLoadError(error?.message||'分享行程載入失敗')})
+  return()=>{cancelled=true}
+ },[shareLoadNonce])
  useEffect(()=>{if(active&&!active.days.some(d=>d.id===tab))setTab(active.days[0]?.id||null)},[active?.id,active?.days.length])
+ useEffect(()=>{setShortShareUrl('')},[active?.updated])
  const saveTrip=(v:any)=>{
   if(form&&form!==true){
    const p=profile(v.destination);const existing=form;let days=existing.days
@@ -1674,20 +1701,48 @@ function App(){
   const t={...active,days:active.days.map(d=>d.id!==day?d:{...d,items:d.items.map(i=>i.id!==it?i:{...i,checks:i.checks?.map(c=>c.id===cid?{...c,done:!c.done}:c)})})}
   update({...s,trips:s.trips.map(z=>z.id===t.id?t:z)})
  }
+ const createShortReadonlyLink=async()=>{
+  if(!active)throw new Error('找不到旅行資料')
+  if(shortShareUrl)return shortShareUrl
+  setShareBusy(true)
+  setShareMessage('正在建立短網址…')
+  try{
+   const response=await fetch('/api/share',{
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({trip:compactReadonlyTrip(active),expiresInDays:shareExpiryDays})
+   })
+   const payload=await response.json().catch(()=>({}))
+   if(!response.ok)throw new Error(payload.error||'短網址建立失敗')
+   const url=`${location.origin}/share/${payload.code}`
+   setShortShareUrl(url)
+   setShareMessage(`短網址已建立：${url}`)
+   return url
+  }catch(error:any){
+   const fallback=legacyReadonlyShareUrl(active)
+   setShareMessage(`短網址服務尚未設定完成，暫時改用舊版唯讀連結。${error?.message?`（${error.message}）`:''}`)
+   return fallback
+  }finally{
+   setShareBusy(false)
+  }
+ }
  const copyReadonlyLink=async()=>{
-  if(!active)return
-  const url=readonlyShareUrl(active)
-  await navigator.clipboard.writeText(url)
-  setShareMessage('唯讀分享連結已複製。')
+  try{
+   const url=await createShortReadonlyLink()
+   await navigator.clipboard.writeText(url)
+   setShareMessage(`唯讀連結已複製：${url}`)
+  }catch(error:any){
+   setShareMessage(error?.message||'複製連結失敗')
+  }
  }
  const shareReadonlyLink=async()=>{
   if(!active)return
-  const url=readonlyShareUrl(active)
+  const url=await createShortReadonlyLink()
   try{
    if(navigator.share)await navigator.share({title:active.name,text:`查看「${active.name}」完整旅行行程（唯讀）`,url})
-   else{await navigator.clipboard.writeText(url);setShareMessage('裝置不支援系統分享，連結已複製。')}
+   else{await navigator.clipboard.writeText(url);setShareMessage('裝置不支援系統分享，短網址已複製。')}
   }catch(error:any){
-   if(error?.name!=='AbortError'){await navigator.clipboard.writeText(url);setShareMessage('LINE 分享未完成，唯讀連結已自動複製，可直接貼到聊天室。')}
+   if(error?.name!=='AbortError'){await navigator.clipboard.writeText(url);setShareMessage('LINE 分享未完成，短網址已自動複製，可直接貼到聊天室。')}
   }
  }
  const buildTripPdf=async()=>{
@@ -1750,6 +1805,18 @@ function App(){
  }
  const share=()=>{setShareMessage('');setShareOpen(true)}
  const legacy=()=>{try{const old=JSON.parse(localStorage.getItem(oldKey)||'null');if(!old?.trips?.length)return alert('找不到舊版資料');const trips=old.trips.map((o:any)=>{const t=makeTrip({name:o.tripName,destination:o.destination,start:o.start,end:o.end});t.id=String(o.tripId||id());t.currency=o.currency||t.currency;t.language=o.langName||t.language;t.days=(o.days||[]).map((d:any)=>({id:String(d.id||id()),date:d.date,title:d.title,items:(d.items||[]).map((i:any)=>({id:String(i.id||id()),type:i.type==='transport'?'transport':'place',start:i.startTime||'',end:i.endTime||'',title:i.place||'',note:i.note||''}))}));return t});update({version:2,active:trips[0].id,trips});setTab(trips[0].days[0]?.id||null);alert(`已匯入 ${trips.length} 個旅行`)}catch{alert('匯入失敗')}}
+
+ if(shortShareCode&&!remoteShared){
+  return <div className="shared-loading-screen">
+   <section className="card shared-loading-card">
+    <span className="shared-loading-icon">{shareLoadError?'⚠️':'🧳'}</span>
+    <small>TRAVEL PLANNER SHARE</small>
+    <h1>{shareLoadError?'無法開啟分享行程':'正在載入唯讀旅行'}</h1>
+    <p>{shareLoadError||`分享代碼：${shortShareCode}`}</p>
+    {shareLoadError&&<button className="btn primary" onClick={()=>setShareLoadNonce(value=>value+1)}>重新載入</button>}
+   </section>
+  </div>
+ }
 
  if(active){
   const current=active.days.find(d=>d.id===tab)||active.days[0]
@@ -1816,9 +1883,11 @@ function App(){
    </main>
    {shareOpen&&<ModalShell title="分享旅行" onClose={()=>setShareOpen(false)}>
     <section className="share-center">
-     <article className="share-intro"><Share2 size={28}/><div><h3>{active.name}</h3><p>選擇適合 iPhone、LINE 或電腦的分享方式。</p></div></article>
-     <button className="share-choice primary" onClick={shareReadonlyLink}><span>🔗</span><div><b>分享到 LINE／其他 App</b><small>傳送精簡的唯讀連結，對方可完整觀看但不能修改。</small></div></button>
-     <button className="share-choice" onClick={copyReadonlyLink}><span>📋</span><div><b>複製唯讀連結</b><small>LINE 分享中斷時，可直接貼到好友聊天室。</small></div></button>
+     <article className="share-intro"><Share2 size={28}/><div><h3>{active.name}</h3><p>建立短網址後，親友只能查看，不能修改你的行程。</p></div></article>
+     <label className="share-expiry">分享有效期限<select value={shareExpiryDays} onChange={event=>{setShareExpiryDays(Number(event.target.value));setShortShareUrl('')}}><option value={7}>7 天</option><option value={30}>30 天</option><option value={90}>90 天</option><option value={365}>1 年</option></select></label>
+     {shortShareUrl&&<div className="short-share-preview"><small>唯讀短網址</small><strong>{shortShareUrl}</strong><span>接收者只能觀看，無法新增、刪除或修改。</span></div>}
+     <button className="share-choice primary" disabled={shareBusy} onClick={shareReadonlyLink}><span>🔗</span><div><b>分享到 LINE／其他 App</b><small>傳送精簡的唯讀連結，對方可完整觀看但不能修改。</small></div></button>
+     <button className="share-choice" disabled={shareBusy} onClick={copyReadonlyLink}><span>📋</span><div><b>複製唯讀連結</b><small>LINE 分享中斷時，可直接貼到好友聊天室。</small></div></button>
      <button className="share-choice yellow" disabled={shareBusy} onClick={shareTripPdf}><span>📄</span><div><b>{shareBusy?'正在製作 PDF…':'分享整份旅行 PDF'}</b><small>包含所有 Day 的行程，製作完成後再開啟 iPhone 分享選單。</small></div></button>
      <button className="share-choice" onClick={exportTripBackup}><span>📦</span><div><b>匯出旅行備份檔</b><small>保留可再次匯入的完整旅行資料。</small></div></button>
      <button className="share-choice" onClick={()=>window.print()}><span>🖨️</span><div><b>列印／另存 PDF</b><small>使用瀏覽器列印功能自行儲存。</small></div></button>
@@ -1835,7 +1904,7 @@ function App(){
   </div>
  }
 
- return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.1.1</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
+ return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.2.1</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
  {s.trips.length?<div className="grid">{s.trips.map(t=><article className={`trip-card theme-${t.theme}`} key={t.id}><button className="trip-cover" style={t.cover?{backgroundImage:`url(${t.cover})`}:{}} onClick={()=>{update({...s,active:t.id});setTab(t.days[0]?.id||null);setPage('home')}}><div><small>{t.country}</small><b>{t.destination}</b><span>{t.start} ～ {t.end}</span></div></button><div className="trip-info"><div><h3>{t.name}</h3><p>{t.currency}・{t.language}</p><small className="theme-name">{themes.find(x=>x.id===t.theme)?.name}</small></div><div className="icons"><button onClick={()=>setForm(t)}><Pencil size={17}/></button><button onClick={()=>duplicate(t)}><Copy size={17}/></button><button onClick={()=>remove(t)}><Trash2 size={17}/></button></div></div></article>)}</div>:<section className="card empty-home"><div>🧳</div><h2>建立第一本旅行手帳</h2><p>釜山、日本、泰國或任何目的地，都能建立獨立行程。</p><button className="btn primary" onClick={()=>setForm(true)}><Plus/>新增旅行</button><button className="btn" onClick={legacy}><Upload size={17}/>匯入舊版</button></section>}</main>
  {form&&<Form trip={form===true?undefined:form} onSave={saveTrip} onClose={()=>setForm(null)}/>}
  </div>
