@@ -1,5 +1,5 @@
 {
-  "name": "旅行手帳 Travel Planner Ultimate 3.3.0",
+  "name": "旅行手帳 Travel Planner Ultimate 3.4.0",
   "short_name": "旅行手帳",
   "start_url": "/",
   "display": "standalone",
@@ -20,5 +20,5 @@
       "purpose": "any maskable"
     }
   ],
-  "description": "完整旅行、錢包分帳與密碼保護唯讀分享"
+  "description": "Live Share 即時同步與 App 樣式 PDF 匯出中心"
 }

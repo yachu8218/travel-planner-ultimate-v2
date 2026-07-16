@@ -31,6 +31,9 @@ type Traveler={id:string;name:string}
 type Expense={id:string;title:string;amount:number;currency:string;payerId:string;participantIds:string[];category:string;date:string;note?:string}
 type WalletData={travelers:Traveler[];expenses:Expense[];budgetTwd:number;overseasFee:number}
 type ShareScope='itinerary'|'budget'|'wallet'
+type PdfMode='app'|'a4'
+type PdfOptions={cover:boolean;tripInfo:boolean;flights:boolean;itinerary:boolean;notes:boolean;budget:boolean;expenses:boolean}
+type LiveShareInfo={code:string;url:string;editToken:string;scope:ShareScope;expiresInDays:number;password:string;updatedAt:number}
 type Trip={
  id:string,name:string,destination:string,country:string,currency:string,language:string,locale:string,
  start:string,end:string,lat:number,lon:number,cover?:string,days:Day[],theme:ThemeId,wallet?:WalletData,favorites?:Item[],created:number,updated:number
@@ -106,6 +109,10 @@ const wicon=(c:number)=>c===0?'☀️':c<=3?'⛅':c<=48?'🌫️':c<=67?'🌧️
 const modeLabel:Record<TransportMode,string>={walk:'步行',metro:'地鐵',bus:'公車',taxi:'計程車',car:'自駕／租車',train:'火車／高鐵／KTX',flight:'飛機',ferry:'渡輪'}
 const modeEmoji:Record<TransportMode,string>={walk:'🚶',metro:'🚇',bus:'🚌',taxi:'🚕',car:'🚗',train:'🚄',flight:'✈️',ferry:'⛴️'}
 const typeName:Record<TType,string>={place:'景點',meal:'餐廳／甜點',hotel:'住宿',transport:'交通',flight:'航班',note:'便條紙'}
+const defaultPdfOptions:PdfOptions={cover:true,tripInfo:true,flights:true,itinerary:true,notes:true,budget:false,expenses:false}
+const liveShareStorageKey=(tripId:string)=>`travel-live-share-${tripId}`
+const readLiveShare=(tripId:string):LiveShareInfo|null=>{try{return JSON.parse(localStorage.getItem(liveShareStorageKey(tripId))||'null')}catch{return null}}
+const writeLiveShare=(tripId:string,value:LiveShareInfo)=>localStorage.setItem(liveShareStorageKey(tripId),JSON.stringify(value))
 
 const timeValue=(value?:string)=>{
  if(!value)return Number.MAX_SAFE_INTEGER
@@ -1531,6 +1538,15 @@ function App(){
  const [sharePassword,setSharePassword]=useState('')
  const [shareAccessPassword,setShareAccessPassword]=useState('')
  const [shareNeedsPassword,setShareNeedsPassword]=useState(false)
+ const [liveShare,setLiveShare]=useState<LiveShareInfo|null>(null)
+ const [shareRemoteUpdatedAt,setShareRemoteUpdatedAt]=useState(0)
+ const [shareUpdateAvailable,setShareUpdateAvailable]=useState(false)
+ const [pendingSharedTrip,setPendingSharedTrip]=useState<Trip|null>(null)
+ const [pdfOpen,setPdfOpen]=useState(false)
+ const [pdfBusy,setPdfBusy]=useState(false)
+ const [pdfMode,setPdfMode]=useState<PdfMode>('app')
+ const [pdfOptions,setPdfOptions]=useState<PdfOptions>(defaultPdfOptions)
+ const liveSyncTimer=useRef<number|undefined>(undefined)
  const [draggingItem,setDraggingItem]=useState<string|null>(null)
  const dragTimer=useRef<number|undefined>(undefined)
  const dragPointer=useRef<number|undefined>(undefined)
@@ -1589,13 +1605,53 @@ function App(){
     if(cancelled)return
     const trip=normalizeTrip(payload.trip)
     setRemoteShared(trip)
+    setShareRemoteUpdatedAt(Number(payload.updatedAt)||trip.updated||Date.now())
+    setShareUpdateAvailable(false)
+    setPendingSharedTrip(null)
     setS({version:2,active:trip.id,trips:[trip]})
    })
    .catch(error=>{if(!cancelled)setShareLoadError(error?.message||'分享行程載入失敗')})
   return()=>{cancelled=true}
  },[shareLoadNonce,shareAccessPassword])
+ useEffect(()=>{
+  if(!shortShareCode||!remoteShared)return
+  let cancelled=false
+  const checkLatest=async()=>{
+   try{
+    const response=await fetch(`/api/share/${encodeURIComponent(shortShareCode)}`,{
+     headers:shareAccessPassword?{'x-share-password':shareAccessPassword}:{},
+     cache:'no-store'
+    })
+    if(!response.ok)return
+    const payload=await response.json()
+    const updatedAt=Number(payload.updatedAt)||0
+    if(!cancelled&&updatedAt>shareRemoteUpdatedAt){
+     setPendingSharedTrip(normalizeTrip(payload.trip))
+     setShareUpdateAvailable(true)
+    }
+   }catch{}
+  }
+  const timer=window.setInterval(checkLatest,30000)
+  const visible=()=>{if(document.visibilityState==='visible')checkLatest()}
+  document.addEventListener('visibilitychange',visible)
+  return()=>{cancelled=true;window.clearInterval(timer);document.removeEventListener('visibilitychange',visible)}
+ },[shortShareCode,remoteShared?.id,shareRemoteUpdatedAt,shareAccessPassword])
+ const applySharedUpdate=()=>{
+  if(!pendingSharedTrip)return
+  setRemoteShared(pendingSharedTrip)
+  setShareRemoteUpdatedAt(pendingSharedTrip.updated||Date.now())
+  setS({version:2,active:pendingSharedTrip.id,trips:[pendingSharedTrip]})
+  setPendingSharedTrip(null)
+  setShareUpdateAvailable(false)
+ }
  useEffect(()=>{if(active&&!active.days.some(d=>d.id===tab))setTab(active.days[0]?.id||null)},[active?.id,active?.days.length])
  useEffect(()=>{setShortShareUrl('')},[active?.updated,shareScope,sharePassword,shareExpiryDays])
+ useEffect(()=>{
+  if(!active||readOnly){setLiveShare(null);return}
+  const stored=readLiveShare(active.id)
+  setLiveShare(stored)
+  if(stored){setShortShareUrl(stored.url);setShareScope(stored.scope);setShareExpiryDays(stored.expiresInDays)}
+ },[active?.id,readOnly])
  const saveTrip=(v:any)=>{
   if(form&&form!==true){
    const p=profile(v.destination);const existing=form;let days=existing.days
@@ -1734,8 +1790,14 @@ function App(){
    const payload=await response.json().catch(()=>({}))
    if(!response.ok)throw new Error(payload.error||'短網址建立失敗')
    const url=`${location.origin}/share/${payload.code}`
+   const info:LiveShareInfo={
+    code:String(payload.code),url,editToken:String(payload.editToken||''),
+    scope:shareScope,expiresInDays:shareExpiryDays,password:sharePassword.trim(),
+    updatedAt:Number(payload.updatedAt)||active.updated||Date.now()
+   }
+   if(info.editToken){writeLiveShare(active.id,info);setLiveShare(info)}
    setShortShareUrl(url)
-   setShareMessage(`短網址已建立：${url}`)
+   setShareMessage(`Live Share 已建立：${url}`)
    return url
   }catch(error:any){
    const fallback=legacyReadonlyShareUrl(active)
@@ -1744,6 +1806,38 @@ function App(){
   }finally{
    setShareBusy(false)
   }
+ }
+ const syncLiveShare=async(trip:Trip,info:LiveShareInfo)=>{
+  if(!info.editToken)return
+  const response=await fetch(`/api/share/${encodeURIComponent(info.code)}`,{
+   method:'PUT',
+   headers:{'content-type':'application/json','x-share-edit-token':info.editToken},
+   body:JSON.stringify({
+    trip:compactReadonlyTrip(trip,info.scope),
+    scope:info.scope,
+    password:info.password||undefined
+   })
+  })
+  if(!response.ok)throw new Error((await response.json().catch(()=>({}))).error||'同步失敗')
+  const payload=await response.json()
+  const next={...info,updatedAt:Number(payload.updatedAt)||Date.now()}
+  writeLiveShare(trip.id,next)
+  setLiveShare(next)
+ }
+ useEffect(()=>{
+  if(readOnly||!active||!liveShare||active.id!==s.active)return
+  window.clearTimeout(liveSyncTimer.current)
+  liveSyncTimer.current=window.setTimeout(()=>{
+   syncLiveShare(active,liveShare).catch(()=>{})
+  },1400)
+  return()=>window.clearTimeout(liveSyncTimer.current)
+ },[active?.updated,liveShare?.code,readOnly])
+ const updateLiveShareNow=async()=>{
+  if(!active||!liveShare)return
+  setShareBusy(true);setShareMessage('正在同步最新旅行資料…')
+  try{await syncLiveShare(active,liveShare);setShareMessage('分享連結已同步到最新內容。')}
+  catch(error:any){setShareMessage(error?.message||'同步失敗')}
+  finally{setShareBusy(false)}
  }
  const copyReadonlyLink=async()=>{
   try{
@@ -1764,56 +1858,100 @@ function App(){
    if(error?.name!=='AbortError'){await navigator.clipboard.writeText(url);setShareMessage('LINE 分享未完成，短網址已自動複製，可直接貼到聊天室。')}
   }
  }
- const buildTripPdf=async()=>{
+ const buildTripPdf=async(options:PdfOptions,mode:PdfMode)=>{
   if(!active)throw new Error('找不到旅行資料')
+  const theme=themes.find(item=>item.id===active.theme)||themes[0]
+  const colors=theme.colors
+  const wallet=active.wallet||defaultWallet()
+  const flights=active.days.flatMap(day=>day.items.map(item=>({day,item}))).filter(entry=>entry.item.type==='flight')
+  const allChecks=active.days.flatMap(day=>day.items.flatMap(item=>(item.checks||[]).map(check=>({day,item,check}))))
+  const expenseTotal=wallet.expenses.reduce((sum,expense)=>sum+Number(expense.amount||0),0)
+  const section=(title:string,body:string)=>`<section class="pdf-section"><h2>${escapeHtml(title)}</h2>${body}</section>`
+  const itemCard=(item:Item)=>`<article class="pdf-app-card ${escapeHtml(item.type)}">
+   <div class="pdf-app-time"><b>${escapeHtml(item.start||'--:--')}</b><span>～</span><b>${escapeHtml(item.end||'--:--')}</b></div>
+   <div class="pdf-app-body"><small>${escapeHtml(typeName[item.type])}</small><h3>${escapeHtml(item.title)}</h3>
+   ${(item.from||item.to)?`<p class="pdf-route">${escapeHtml(item.from||'')} → ${escapeHtml(item.to||'')}</p>`:''}
+   ${item.address?`<p>📍 ${escapeHtml(item.address)}</p>`:''}
+   ${options.notes&&item.note?`<p class="pdf-note">${escapeHtml(item.note)}</p>`:''}
+   ${options.notes&&item.checks?.length?`<div class="pdf-checks">${item.checks.map(check=>`<span>${check.done?'☑':'☐'} ${escapeHtml(check.text)}</span>`).join('')}</div>`:''}
+   </div></article>`
+  const cover=options.cover?`<section class="pdf-cover">
+   <div class="pdf-cover-mark">TRAVEL PLANNER ULTIMATE</div>
+   <div class="pdf-cover-emoji">🧳</div><h1>${escapeHtml(active.name)}</h1>
+   <h3>${escapeHtml(active.destination)}</h3><p>${escapeHtml(active.start)} ～ ${escapeHtml(active.end)}</p>
+   <div class="pdf-theme-dots">${colors.map(color=>`<i style="background:${color}"></i>`).join('')}</div>
+  </section>`:''
+  const tripInfo=options.tripInfo?section('旅行資訊',`<div class="pdf-info-grid">
+   <div><small>目的地</small><b>${escapeHtml(active.destination)}</b></div>
+   <div><small>旅行日期</small><b>${escapeHtml(active.start)} ～ ${escapeHtml(active.end)}</b></div>
+   <div><small>幣別</small><b>${escapeHtml(active.currency)}</b></div>
+   <div><small>語言</small><b>${escapeHtml(active.language)}</b></div>
+   <div><small>行程天數</small><b>${active.days.length} Days</b></div>
+   <div><small>主題</small><b>${escapeHtml(theme.name)}</b></div>
+  </div>`):''
+  const flightHtml=options.flights&&flights.length?section('航班資訊',flights.map(({day,item})=>`<article class="pdf-flight-card">
+   <div><small>${escapeHtml(day.date)}</small><h3>✈️ ${escapeHtml(item.flightNo||item.title)}</h3></div>
+   <div class="pdf-flight-route"><b>${escapeHtml(item.from||'出發地')}</b><span>${escapeHtml(item.start)} → ${escapeHtml(item.end)}</span><b>${escapeHtml(item.to||'抵達地')}</b></div>
+   <p>${[item.departureTerminal&&`出發航廈：${item.departureTerminal}`,item.arrivalTerminal&&`抵達航廈：${item.arrivalTerminal}`,item.baggageBelt&&`行李轉盤：${item.baggageBelt}`].filter(Boolean).map(escapeHtml).join('・')}</p>
+  </article>`).join('')):''
+  const itinerary=options.itinerary?active.days.map((day,index)=>section(`Day ${index+1}・${day.date}・${day.title}`,
+   `<div class="pdf-day-list">${day.items.length?day.items.map(itemCard).join(''):'<p class="pdf-empty">本日尚無行程</p>'}</div>`)).join(''):''
+  const notes=options.notes&&allChecks.length?section('待辦與提醒',allChecks.map(({day,item,check})=>`<div class="pdf-todo"><span>${check.done?'☑':'☐'}</span><div><b>${escapeHtml(check.text)}</b><small>${escapeHtml(day.date)}・${escapeHtml(item.title)}</small></div></div>`).join('')):''
+  const budget=options.budget?section('旅行預算',`<div class="pdf-budget-grid">
+   <div><small>總預算</small><b>NT$ ${wallet.budgetTwd.toLocaleString()}</b></div>
+   <div><small>目前花費</small><b>NT$ ${expenseTotal.toLocaleString()}</b></div>
+   <div><small>剩餘預算</small><b>NT$ ${Math.max(0,wallet.budgetTwd-expenseTotal).toLocaleString()}</b></div>
+   <div><small>旅伴人數</small><b>${wallet.travelers.length} 人</b></div>
+  </div>`):''
+  const expenses=options.expenses&&wallet.expenses.length?section('錢包與分帳',wallet.expenses.map(expense=>`<article class="pdf-expense">
+   <div><small>${escapeHtml(expense.date||'')}</small><h3>${escapeHtml(expense.title||expense.category||'消費')}</h3><p>付款：${escapeHtml(wallet.travelers.find(t=>t.id===expense.payerId)?.name||'未指定')}</p></div>
+   <b>${escapeHtml(expense.currency)} ${Number(expense.amount||0).toLocaleString()}</b>
+  </article>`).join('')):''
   const host=document.createElement('div')
-  host.className='trip-pdf-document'
-  host.innerHTML=`<header><small>TRAVEL PLANNER ULTIMATE</small><h1>${escapeHtml(active.name)}</h1><p>${escapeHtml(active.destination)}｜${escapeHtml(active.start)} ～ ${escapeHtml(active.end)}</p></header>`+
-   active.days.map((day,index)=>`<section><h2>Day ${index+1}・${escapeHtml(day.date)}・${escapeHtml(day.title)}</h2>`+
-    (day.items.length?day.items.map(item=>`<article><div class="pdf-time">${escapeHtml(item.start)}<br>～<br>${escapeHtml(item.end)}</div><div><small>${escapeHtml(typeName[item.type])}</small><h3>${escapeHtml(item.title)}</h3>${item.from||item.to?`<p>${escapeHtml(item.from||'')} → ${escapeHtml(item.to||'')}</p>`:''}${item.address?`<p>${escapeHtml(item.address)}</p>`:''}${item.note?`<p>${escapeHtml(item.note)}</p>`:''}</div></article>`).join(''):'<p>本日尚無行程</p>')+
-   `</section>`).join('')
+  host.className=`trip-pdf-document pdf-${mode}`
+  host.style.setProperty('--pdf-primary',colors[0])
+  host.style.setProperty('--pdf-secondary',colors[1])
+  host.style.setProperty('--pdf-accent',colors[2])
+  host.innerHTML=cover+tripInfo+flightHtml+itinerary+notes+budget+expenses+
+   `<footer>由 Travel Planner Ultimate v3.4.0 製作・${new Date().toLocaleDateString('zh-TW')}</footer>`
   document.body.appendChild(host)
   try{
    const [{default:html2canvas},{jsPDF}]=await Promise.all([import('html2canvas'),import('jspdf')])
-   const canvas=await html2canvas(host,{scale:1.6,useCORS:true,backgroundColor:'#ffffff'})
+   const canvas=await html2canvas(host,{scale:mode==='app'?2:1.6,useCORS:true,backgroundColor:'#ffffff',logging:false})
    const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'})
    const pageWidth=210,pageHeight=297
    const imageWidth=pageWidth
    const imageHeight=canvas.height*imageWidth/canvas.width
-   const image=canvas.toDataURL('image/jpeg',0.92)
-   let y=0
-   pdf.addImage(image,'JPEG',0,y,imageWidth,imageHeight)
+   const image=canvas.toDataURL('image/jpeg',0.94)
+   let offset=0
+   pdf.addImage(image,'JPEG',0,offset,imageWidth,imageHeight)
    let remaining=imageHeight-pageHeight
    while(remaining>0){
-    y=remaining-imageHeight
+    offset=remaining-imageHeight
     pdf.addPage()
-    pdf.addImage(image,'JPEG',0,y,imageWidth,imageHeight)
+    pdf.addImage(image,'JPEG',0,offset,imageWidth,imageHeight)
     remaining-=pageHeight
    }
    return pdf.output('blob')
-  }finally{
-   host.remove()
-  }
+  }finally{host.remove()}
  }
- const shareTripPdf=async()=>{
+ const exportTripPdf=async(action:'share'|'download')=>{
   if(!active)return
-  setShareBusy(true);setShareMessage('正在製作整份旅行 PDF…')
+  setPdfBusy(true)
   try{
-   const blob=await buildTripPdf()
+   const blob=await buildTripPdf(pdfOptions,pdfMode)
    const safeName=active.name.replace(/[\\/:*?"<>|]/g,'_')
-   const file=new File([blob],`${safeName}.pdf`,{type:'application/pdf'})
-   if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){
-    await navigator.share({title:`${active.name}旅行手冊`,text:'完整旅行 PDF',files:[file]})
-    setShareMessage('PDF 分享完成。')
+   const file=new File([blob],`${safeName}-旅行手冊.pdf`,{type:'application/pdf'})
+   if(action==='share'&&navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){
+    await navigator.share({title:`${active.name}旅行手冊`,text:'旅行手冊 PDF',files:[file]})
    }else{
     const url=URL.createObjectURL(blob)
     const anchor=document.createElement('a');anchor.href=url;anchor.download=file.name;anchor.click()
     setTimeout(()=>URL.revokeObjectURL(url),5000)
-    setShareMessage('裝置不支援直接分享 PDF，已改為下載。')
    }
   }catch(error:any){
-   if(error?.name!=='AbortError')setShareMessage(`PDF 分享失敗：${error?.message||'請稍後再試'}`)
-  }finally{setShareBusy(false)}
+   if(error?.name!=='AbortError')alert(`PDF 匯出失敗：${error?.message||'請稍後再試'}`)
+  }finally{setPdfBusy(false)}
  }
  const exportTripBackup=()=>{
   if(!active)return
@@ -1876,6 +2014,8 @@ function App(){
   </>
 
   return <div className={`app theme-${active.theme}`}>
+   {readOnly&&shareUpdateAvailable&&<div className="live-update-banner"><span>📢 分享行程已有更新</span><button onClick={applySharedUpdate}>更新內容</button></div>}
+   {readOnly&&<button className="shared-refresh-button" onClick={()=>setShareLoadNonce(value=>value+1)} title="重新整理最新內容">↻</button>}
    <header className="top"><button className="icon" onClick={()=>update({...s,active:null})}><ArrowLeft/></button><div><small>{readOnly?'親友唯讀行程':'旅行控制中心'}</small><h1>{active.name}</h1></div>{!readOnly&&<button className="icon" onClick={()=>setForm(active)}><Palette size={18}/></button>}</header>
    <main className="content trip page-with-nav">
     {page==='home'&&<>
@@ -1890,7 +2030,7 @@ function App(){
       <article className="card control-card"><WalletCards size={25}/><small>旅行錢包</small><h3>{active.currency}</h3><span>即時匯率、預算與旅伴分帳</span><button className="inline-link" onClick={()=>setPage('wallet')}>開啟旅行錢包 →</button></article>
      </section>
 
-     {!readOnly&&<div className="quick"><button className="btn primary" onClick={share}><Share2 size={18}/>分享行程</button><button className="btn yellow" onClick={()=>window.print()}><FileDown size={18}/>列印／PDF</button></div>}
+     {!readOnly&&<div className="quick"><button className="btn primary" onClick={share}><Share2 size={18}/>分享行程</button><button className="btn yellow" onClick={()=>setPdfOpen(true)}><FileDown size={18}/>匯出 PDF</button></div>}
     </>}
     {page==='itinerary'&&itinerary}
     {page==='explore'&&<ExploreCenter trip={active} onAdd={addToCurrentDay} onFavorite={addFavorite} onRemoveFavorite={removeFavorite}/>}
@@ -1899,7 +2039,7 @@ function App(){
     {page==='more'&&<><article className="card connector-setting">
  <div><small>ITINERARY STYLE</small><h3>行程連接小插畫</h3><p>在每個行程之間顯示飛機、餐盤、地鐵等小插畫。</p></div>
  <button className={showConnectors?'toggle-switch active':'toggle-switch'} onClick={()=>{const next=!showConnectors;setShowConnectors(next);localStorage.setItem('travel-planner-show-connectors',String(next))}} aria-label="切換行程小插畫"><i/></button>
-</article><section className="tools-grid"><button className="card tool-card" onClick={()=>setForm(active)}><Palette/><b>主題風格</b><span>20 種官方主題</span></button><button className="card tool-card" onClick={()=>window.print()}><FileDown/><b>旅行手冊</b><span>列印／PDF</span></button><button className="card tool-card" onClick={()=>setFlightOpen(true)}><Plane/><b>航班中心</b><span>查詢或手動建立航班</span></button><button className="card tool-card" onClick={()=>setTransitOpen(true)}><Compass/><b>交通中心</b><span>建立地鐵、公車與步行路線</span></button><button className="card tool-card" onClick={()=>setWeatherOpen(true)}><CloudSun/><b>天氣中心</b><span>七天天氣與手動更新</span></button></section></>}
+</article><section className="tools-grid"><button className="card tool-card" onClick={()=>setForm(active)}><Palette/><b>主題風格</b><span>20 種官方主題</span></button><button className="card tool-card" onClick={()=>setPdfOpen(true)}><FileDown/><b>旅行手冊</b><span>自選內容・App 樣式 PDF</span></button><button className="card tool-card" onClick={()=>setFlightOpen(true)}><Plane/><b>航班中心</b><span>查詢或手動建立航班</span></button><button className="card tool-card" onClick={()=>setTransitOpen(true)}><Compass/><b>交通中心</b><span>建立地鐵、公車與步行路線</span></button><button className="card tool-card" onClick={()=>setWeatherOpen(true)}><CloudSun/><b>天氣中心</b><span>七天天氣與手動更新</span></button></section></>}
    </main>
    {shareOpen&&<ModalShell title="分享旅行" onClose={()=>setShareOpen(false)}>
     <section className="share-center">
@@ -1912,12 +2052,40 @@ function App(){
      </fieldset>
      <label className="share-password-field">分享密碼（選填）<input type="password" inputMode="numeric" maxLength={12} value={sharePassword} onChange={event=>setSharePassword(event.target.value)} placeholder="留空代表不需要密碼"/><small>設定後，親友需輸入密碼才能查看。</small></label>
      {shortShareUrl&&<div className="short-share-preview"><small>唯讀短網址</small><strong>{shortShareUrl}</strong><span>{shareScope==='wallet'?'包含完整錢包與分帳':shareScope==='budget'?'包含預算摘要':'僅包含行程'}・接收者只能觀看。</span></div>}
+     {liveShare&&<div className="live-share-status"><span>● LIVE</span><div><b>此連結會自動同步</b><small>最後同步：{new Date(liveShare.updatedAt).toLocaleString('zh-TW')}</small></div><button className="btn" disabled={shareBusy} onClick={updateLiveShareNow}>立即同步</button></div>}
      <button className="share-choice primary" disabled={shareBusy} onClick={shareReadonlyLink}><span>🔗</span><div><b>分享到 LINE／其他 App</b><small>傳送精簡的唯讀連結，對方可完整觀看但不能修改。</small></div></button>
      <button className="share-choice" disabled={shareBusy} onClick={copyReadonlyLink}><span>📋</span><div><b>複製唯讀連結</b><small>LINE 分享中斷時，可直接貼到好友聊天室。</small></div></button>
-     <button className="share-choice yellow" disabled={shareBusy} onClick={shareTripPdf}><span>📄</span><div><b>{shareBusy?'正在製作 PDF…':'分享整份旅行 PDF'}</b><small>包含所有 Day 的行程，製作完成後再開啟 iPhone 分享選單。</small></div></button>
+     <button className="share-choice yellow" onClick={()=>setPdfOpen(true)}><span>📄</span><div><b>PDF 匯出中心</b><small>自由選擇行程、航班、待辦、預算或分帳，並套用 App 主題樣式。</small></div></button>
      <button className="share-choice" onClick={exportTripBackup}><span>📦</span><div><b>匯出旅行備份檔</b><small>保留可再次匯入的完整旅行資料。</small></div></button>
-     <button className="share-choice" onClick={()=>window.print()}><span>🖨️</span><div><b>列印／另存 PDF</b><small>使用瀏覽器列印功能自行儲存。</small></div></button>
+     <button className="share-choice" onClick={()=>setPdfOpen(true)}><span>🖨️</span><div><b>列印旅行手冊</b><small>先選擇內容與樣式，再產生可列印 PDF。</small></div></button>
      {shareMessage&&<p className="share-message">{shareMessage}</p>}
+    </section>
+   </ModalShell>}
+   {pdfOpen&&<ModalShell title="PDF 匯出中心" onClose={()=>!pdfBusy&&setPdfOpen(false)}>
+    <section className="pdf-export-center">
+     <article className="pdf-export-intro"><span>📖</span><div><h3>{active.name}</h3><p>選擇要放進旅行手冊的內容；預算與分帳預設不匯出。</p></div></article>
+     <fieldset className="pdf-option-grid"><legend>匯出內容</legend>
+      {([
+       ['cover','封面','旅行名稱、目的地與主題色'],
+       ['tripInfo','旅行資訊','日期、幣別、語言與天數'],
+       ['flights','航班資訊','航班路線、時間、航廈與行李'],
+       ['itinerary','每日行程','所有 Day 與 App 卡片式行程'],
+       ['notes','便條與待辦','便條內容與待辦勾選狀態'],
+       ['budget','預算摘要','總預算、花費與剩餘金額'],
+       ['expenses','錢包與分帳','每筆支出與付款人']
+      ] as [keyof PdfOptions,string,string][]).map(([key,title,desc])=><label key={key}>
+       <input type="checkbox" checked={pdfOptions[key]} onChange={event=>setPdfOptions({...pdfOptions,[key]:event.target.checked})}/>
+       <span><b>{title}</b><small>{desc}</small></span>
+      </label>)}
+     </fieldset>
+     <fieldset className="pdf-style-picker"><legend>PDF 樣式</legend>
+      <label className={pdfMode==='app'?'selected':''}><input type="radio" checked={pdfMode==='app'} onChange={()=>setPdfMode('app')}/><span>📱</span><div><b>App 手帳樣式</b><small>保留主題色、粗框、卡片與 Timeline 感</small></div></label>
+      <label className={pdfMode==='a4'?'selected':''}><input type="radio" checked={pdfMode==='a4'} onChange={()=>setPdfMode('a4')}/><span>📄</span><div><b>A4 列印樣式</b><small>欄位較寬，適合紙本閱讀與裝訂</small></div></label>
+     </fieldset>
+     <div className="pdf-export-actions">
+      <button className="btn primary" disabled={pdfBusy||!Object.values(pdfOptions).some(Boolean)} onClick={()=>exportTripPdf('download')}>{pdfBusy?'正在製作…':'儲存 PDF'}</button>
+      <button className="btn yellow" disabled={pdfBusy||!Object.values(pdfOptions).some(Boolean)} onClick={()=>exportTripPdf('share')}>分享 PDF</button>
+     </div>
     </section>
    </ModalShell>}
    {weatherOpen&&<ModalShell title="天氣中心" onClose={()=>setWeatherOpen(false)}><Weather trip={active}/></ModalShell>}
@@ -1930,7 +2098,7 @@ function App(){
   </div>
  }
 
- return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.3.0</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
+ return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.4.0</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
  {s.trips.length?<div className="grid">{s.trips.map(t=><article className={`trip-card theme-${t.theme}`} key={t.id}><button className="trip-cover" style={t.cover?{backgroundImage:`url(${t.cover})`}:{}} onClick={()=>{update({...s,active:t.id});setTab(t.days[0]?.id||null);setPage('home')}}><div><small>{t.country}</small><b>{t.destination}</b><span>{t.start} ～ {t.end}</span></div></button><div className="trip-info"><div><h3>{t.name}</h3><p>{t.currency}・{t.language}</p><small className="theme-name">{themes.find(x=>x.id===t.theme)?.name}</small></div><div className="icons"><button onClick={()=>setForm(t)}><Pencil size={17}/></button><button onClick={()=>duplicate(t)}><Copy size={17}/></button><button onClick={()=>remove(t)}><Trash2 size={17}/></button></div></div></article>)}</div>:<section className="card empty-home"><div>🧳</div><h2>建立第一本旅行手帳</h2><p>釜山、日本、泰國或任何目的地，都能建立獨立行程。</p><button className="btn primary" onClick={()=>setForm(true)}><Plus/>新增旅行</button><button className="btn" onClick={legacy}><Upload size={17}/>匯入舊版</button></section>}</main>
  {form&&<Form trip={form===true?undefined:form} onSave={saveTrip} onClose={()=>setForm(null)}/>}
  </div>
