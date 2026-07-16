@@ -1928,3 +1928,67 @@ form select{
 .shared-loading-card p{
   margin:2px 0;
 }
+
+/* =========================================================
+   v3.3.0 — Complete readonly wallet sharing
+   ========================================================= */
+.share-scope-picker{
+  display:grid;
+  gap:8px;
+  margin:0;
+  padding:11px;
+  border:2px solid var(--ink);
+  border-radius:10px;
+  background:var(--paper);
+}
+.share-scope-picker legend{
+  padding:0 6px;
+  font-size:11px;
+  font-weight:900;
+}
+.share-scope-picker>label{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  gap:9px;
+  align-items:start;
+  padding:9px;
+  border:1px solid color-mix(in srgb,var(--ink) 55%,transparent);
+  border-radius:8px;
+  background:color-mix(in srgb,var(--soft) 58%,white);
+}
+.share-scope-picker span{
+  display:grid;
+  gap:2px;
+}
+.share-scope-picker small,
+.share-password-field small{
+  font-size:9px;
+  color:#64706d;
+}
+.share-password-field,
+.share-unlock-field{
+  display:grid;
+  gap:6px;
+  padding:11px;
+  border:2px solid var(--ink);
+  border-radius:10px;
+  background:var(--paper);
+  font-size:11px;
+  font-weight:900;
+}
+.readonly-wallet .budget-card input{
+  background:var(--soft);
+  cursor:default;
+}
+.readonly-wallet::before{
+  content:"唯讀分享模式｜此頁資料無法修改";
+  display:block;
+  margin-bottom:10px;
+  padding:9px 11px;
+  border:2px dashed var(--accent);
+  border-radius:9px;
+  background:var(--paper);
+  font-size:10px;
+  font-weight:900;
+  text-align:center;
+}

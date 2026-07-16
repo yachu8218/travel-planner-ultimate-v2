@@ -5,7 +5,7 @@ const headers={
  'content-type':'application/json; charset=utf-8',
  'cache-control':'public, max-age=60'
 }
-export const onRequestGet:PagesFunction<Env>=async({env,params})=>{
+export const onRequestGet:PagesFunction<Env>=async({request,env,params})=>{
  if(!env.TRIP_SHARES)return new Response(JSON.stringify({error:'分享服務尚未設定'}),{status:503,headers})
  const code=String(params.code||'').toUpperCase()
  if(!/^[A-Z2-9]{6}$/.test(code))return new Response(JSON.stringify({error:'分享代碼格式不正確'}),{status:400,headers})

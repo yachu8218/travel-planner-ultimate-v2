@@ -1,17 +1,29 @@
-# Travel Planner Ultimate v3.2.1
+# Travel Planner Ultimate v3.3.0
 
-## 修正
-- 修復 `index.html` 被程式內容覆蓋造成的 Vite HTML parse error。
-- 保留 Cloudflare KV 唯讀短網址功能。
-- 保留 v3.1.1 已成功的 pnpm 建置方式。
+## 完整旅行唯讀分享
 
-## Cloudflare Build
-- Build command：`npm run build`
-- Build output：`dist`
-- NODE_VERSION：`20.19.4`
+分享時可選擇：
 
-Cloudflare 會依 `packageManager` 自動使用 pnpm。
+1. 僅行程
+2. 行程＋預算
+3. 行程＋完整錢包分帳
 
-## KV
-Pages → Settings → Bindings → KV namespace
-Variable name：`TRIP_SHARES`
+完整錢包分帳包含旅伴、消費明細、付款人、參與分帳者與最終結算。
+
+親友開啟後仍為唯讀，不能新增、刪除或修改資料。
+
+## 分享密碼
+
+分享密碼為選填。設定後，親友開啟短網址時必須輸入正確密碼。
+
+密碼只會以 SHA-256 雜湊儲存在 Cloudflare KV，不儲存明碼。
+
+## Cloudflare
+
+延用原本的 KV Binding：
+
+```text
+TRIP_SHARES
+```
+
+不需要新增其他環境變數或 Binding。

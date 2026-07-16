@@ -30,6 +30,7 @@ type Day={id:string,date:string,title:string,items:Item[]}
 type Traveler={id:string;name:string}
 type Expense={id:string;title:string;amount:number;currency:string;payerId:string;participantIds:string[];category:string;date:string;note?:string}
 type WalletData={travelers:Traveler[];expenses:Expense[];budgetTwd:number;overseasFee:number}
+type ShareScope='itinerary'|'budget'|'wallet'
 type Trip={
  id:string,name:string,destination:string,country:string,currency:string,language:string,locale:string,
  start:string,end:string,lat:number,lon:number,cover?:string,days:Day[],theme:ThemeId,wallet?:WalletData,favorites?:Item[],created:number,updated:number
@@ -116,21 +117,30 @@ const sortItemsByTime=(items:Item[])=>items
  .map((item,index)=>({item,index,value:timeValue(item.start)}))
  .sort((a,b)=>a.value-b.value||a.index-b.index)
  .map(x=>x.item)
-const compactReadonlyTrip=(trip:Trip):Trip=>({
- ...trip,
- cover:undefined,
- favorites:undefined,
- wallet:undefined,
- days:trip.days.map(day=>({...day,items:day.items.map(item=>({
-  ...item,
-  photoName:undefined,
-  checks:item.checks?.map(check=>({...check}))
- }))}))
-})
+const compactReadonlyTrip=(trip:Trip,scope:ShareScope='itinerary'):Trip=>{
+ const sourceWallet=trip.wallet||defaultWallet()
+ const wallet=scope==='wallet'?structuredClone(sourceWallet):scope==='budget'?{
+  travelers:structuredClone(sourceWallet.travelers),
+  expenses:[],
+  budgetTwd:sourceWallet.budgetTwd,
+  overseasFee:sourceWallet.overseasFee
+ }:undefined
+ return{
+  ...trip,
+  cover:undefined,
+  favorites:undefined,
+  wallet,
+  days:trip.days.map(day=>({...day,items:day.items.map(item=>({
+   ...item,
+   photoName:undefined,
+   checks:item.checks?.map(check=>({...check}))
+  }))}))
+ }
+}
 const escapeHtml=(value:any)=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]||ch))
 const legacyReadonlyShareUrl=(trip:Trip)=>{
  const url=new URL(location.origin+location.pathname)
- url.searchParams.set('share',compressToEncodedURIComponent(JSON.stringify(compactReadonlyTrip(trip))))
+ url.searchParams.set('share',compressToEncodedURIComponent(JSON.stringify(compactReadonlyTrip(trip,'itinerary'))))
  return url.toString()
 }
 
@@ -980,7 +990,7 @@ function ExploreCenter({trip,onAdd,onFavorite,onRemoveFavorite}:{trip:Trip,onAdd
 const currencyDigits=(c:string)=>c==='KRW'||c==='JPY'?0:2
 const money=(n:number,c:string)=>new Intl.NumberFormat('zh-TW',{style:'currency',currency:c,maximumFractionDigits:currencyDigits(c)}).format(Number.isFinite(n)?n:0)
 
-function WalletCenter({trip,onChange}:{trip:Trip,onChange:(w:WalletData)=>void}){
+function WalletCenter({trip,onChange,readOnly=false}:{trip:Trip,onChange:(w:WalletData)=>void;readOnly?:boolean}){
  const wallet=trip.wallet||defaultWallet()
  const [amount,setAmount]=useState('1000')
  const [from,setFrom]=useState(trip.currency)
@@ -1048,15 +1058,15 @@ function WalletCenter({trip,onChange}:{trip:Trip,onChange:(w:WalletData)=>void})
   wallet.expenses.forEach(e=>{const twd=toTwd(e);if(e.payerId===t.id)paid+=twd;if(e.participantIds.includes(t.id)&&e.participantIds.length)share+=twd/e.participantIds.length})
   return{...t,paid,share,balance:paid-share}
  })
- return <section className="wallet-center">
+ return <section className={`wallet-center ${readOnly?'readonly-wallet':''}`}>
   <article className="card wallet-hero"><div><small>TRAVEL WALLET</small><h2>旅行錢包</h2><p>{trip.destination}・{trip.currency}</p></div><div><small>目前總支出</small><strong>{money(totalTwd,'TWD')}</strong><span>預算 {wallet.budgetTwd?Math.round(totalTwd/wallet.budgetTwd*100):0}%</span></div></article>
   <article className="card rate-card"><div className="feature-head"><div><small>EXCHANGE RATE</small><h2>雙向匯率換算</h2></div><button className="icon" onClick={()=>loadRate(true)}><RefreshCw size={18}/></button></div><div className="rate-grid"><div><label>金額<input inputMode="decimal" value={amount} onChange={e=>setAmount(e.target.value)}/></label><select value={from} onChange={e=>setFrom(e.target.value)}><option>{trip.currency}</option><option>TWD</option><option>USD</option><option>EUR</option><option>JPY</option><option>KRW</option></select></div><button className="swap" onClick={swap}>⇄</button><div><label>換算結果<input readOnly value={rate?converted.toFixed(currencyDigits(to)):''}/></label><select value={to} onChange={e=>setTo(e.target.value)}><option>TWD</option><option>{trip.currency}</option><option>USD</option><option>EUR</option><option>JPY</option><option>KRW</option></select></div></div><div className="amount-shortcuts">{(trip.currency==='KRW'?[1000,5000,10000,30000,50000,100000]:trip.currency==='JPY'?[100,500,1000,3000,5000,10000]:[10,20,50,100,200,500]).map(v=><button key={v} onClick={()=>{setFrom(trip.currency);setTo('TWD');setAmount(String(v))}}>{new Intl.NumberFormat('zh-TW').format(v)} {trip.currency}</button>)}</div><p className="rate-status">{rate?`1 ${from} ≈ ${rate.toFixed(6)} ${to}・資料日期 ${rateDate}・${rateMsg}`:rateMsg||'正在取得匯率…'}</p></article>
-  <article className="card budget-card"><div className="feature-head"><div><small>BUDGET</small><h2>旅行預算</h2></div><span>{wallet.budgetTwd?`${Math.max(0,Math.round(100-totalTwd/wallet.budgetTwd*100))}% 剩餘`:'尚未設定'}</span></div><label>總預算（台幣）<input type="number" min="0" value={wallet.budgetTwd||''} onChange={e=>onChange({...wallet,budgetTwd:Number(e.target.value)||0})}/></label><label>海外刷卡手續費（%）<input type="number" min="0" step="0.1" value={wallet.overseasFee} onChange={e=>onChange({...wallet,overseasFee:Number(e.target.value)||0})}/></label></article>
-  <article className="card travelers-card"><div className="feature-head"><div><small>TRAVELERS</small><h2>旅伴</h2></div><span>{wallet.travelers.length} 人</span></div><div className="traveler-add"><input value={newName} onChange={e=>setNewName(e.target.value)} placeholder="輸入旅伴姓名"/><button className="btn primary" onClick={addTraveler}><Plus size={17}/>新增</button></div><div className="traveler-chips">{wallet.travelers.map(t=><span key={t.id}>{t.name}<button onClick={()=>removeTraveler(t.id)}>×</button></span>)}</div></article>
-  <div className="wallet-section-head"><div><small>EXPENSES</small><h2>消費紀錄</h2></div><button className="btn primary" onClick={()=>setExpenseOpen(true)}><Plus size={17}/>新增消費</button></div>
-  <div className="expense-list">{wallet.expenses.length?wallet.expenses.map(e=><article className="card expense-row" key={e.id}><div><small>{e.date}・{e.category}</small><h3>{e.title}</h3><p>{wallet.travelers.find(t=>t.id===e.payerId)?.name||'未指定'}先付款・{e.participantIds.length}人分攤</p></div><div><strong>{money(e.amount,e.currency)}</strong><button onClick={()=>removeExpense(e.id)}><Trash2 size={16}/></button></div></article>):<p className="empty">還沒有消費紀錄。</p>}</div>
+  <article className="card budget-card"><div className="feature-head"><div><small>BUDGET</small><h2>旅行預算</h2></div><span>{wallet.budgetTwd?`${Math.max(0,Math.round(100-totalTwd/wallet.budgetTwd*100))}% 剩餘`:'尚未設定'}</span></div><label>總預算（台幣）<input readOnly={readOnly} type="number" min="0" value={wallet.budgetTwd||''} onChange={e=>!readOnly&&onChange({...wallet,budgetTwd:Number(e.target.value)||0})}/></label><label>海外刷卡手續費（%）<input readOnly={readOnly} type="number" min="0" step="0.1" value={wallet.overseasFee} onChange={e=>!readOnly&&onChange({...wallet,overseasFee:Number(e.target.value)||0})}/></label></article>
+  <article className="card travelers-card"><div className="feature-head"><div><small>TRAVELERS</small><h2>旅伴</h2></div><span>{wallet.travelers.length} 人</span></div>{!readOnly&&<div className="traveler-add"><input value={newName} onChange={e=>setNewName(e.target.value)} placeholder="輸入旅伴姓名"/><button className="btn primary" onClick={addTraveler}><Plus size={17}/>新增</button></div>}<div className="traveler-chips">{wallet.travelers.map(t=><span key={t.id}>{t.name}{!readOnly&&<button onClick={()=>removeTraveler(t.id)}>×</button>}</span>)}</div></article>
+  <div className="wallet-section-head"><div><small>EXPENSES</small><h2>消費紀錄</h2></div>{!readOnly&&<button className="btn primary" onClick={()=>setExpenseOpen(true)}><Plus size={17}/>新增消費</button>}</div>
+  <div className="expense-list">{wallet.expenses.length?wallet.expenses.map(e=><article className="card expense-row" key={e.id}><div><small>{e.date}・{e.category}</small><h3>{e.title}</h3><p>{wallet.travelers.find(t=>t.id===e.payerId)?.name||'未指定'}先付款・{e.participantIds.length}人分攤</p></div><div><strong>{money(e.amount,e.currency)}</strong>{!readOnly&&<button onClick={()=>removeExpense(e.id)}><Trash2 size={16}/></button>}</div></article>):<p className="empty">還沒有消費紀錄。</p>}</div>
   <article className="card settlement-card"><div className="feature-head"><div><small>SPLIT BILL</small><h2>分帳結算</h2></div></div>{balances.map(b=><div className="balance-row" key={b.id}><div><b>{b.name}</b><small>已付 {money(b.paid,'TWD')}・應分攤 {money(b.share,'TWD')}</small></div><strong className={b.balance>=0?'receive':'pay'}>{b.balance>=0?`應收 ${money(b.balance,'TWD')}`:`應付 ${money(-b.balance,'TWD')}`}</strong></div>)}</article>
-  {expenseOpen&&<ModalShell title="新增消費" onClose={()=>setExpenseOpen(false)}><div className="expense-form"><label>消費名稱<input value={exp.title} onChange={e=>setExp({...exp,title:e.target.value})} placeholder="例如：烤肉晚餐"/></label><div className="two"><label>金額<input type="number" inputMode="decimal" value={exp.amount} onChange={e=>setExp({...exp,amount:e.target.value})}/></label><label>幣別<select value={exp.currency} onChange={e=>setExp({...exp,currency:e.target.value})}><option>{trip.currency}</option><option>TWD</option><option>USD</option></select></label></div><div className="two"><label>付款人<select value={exp.payerId} onChange={e=>setExp({...exp,payerId:e.target.value})}>{wallet.travelers.map(t=><option value={t.id} key={t.id}>{t.name}</option>)}</select></label><label>分類<select value={exp.category} onChange={e=>setExp({...exp,category:e.target.value})}><option>餐飲</option><option>交通</option><option>住宿</option><option>門票</option><option>購物</option><option>其他</option></select></label></div><label>日期<input type="date" value={exp.date} onChange={e=>setExp({...exp,date:e.target.value})}/></label><fieldset><legend>參與分帳的人</legend>{wallet.travelers.map(t=><label className="person-check" key={t.id}><input type="checkbox" checked={exp.participantIds.includes(t.id)} onChange={e=>setExp({...exp,participantIds:e.target.checked?[...exp.participantIds,t.id]:exp.participantIds.filter(x=>x!==t.id)})}/>{t.name}</label>)}</fieldset><label>備註<textarea rows={3} value={exp.note} onChange={e=>setExp({...exp,note:e.target.value})}/></label><div className="sticky-actions"><button className="btn" onClick={()=>setExpenseOpen(false)}>取消</button><button className="btn primary" onClick={addExpense}>儲存消費</button></div></div></ModalShell>}
+  {expenseOpen&&!readOnly&&<ModalShell title="新增消費" onClose={()=>setExpenseOpen(false)}><div className="expense-form"><label>消費名稱<input value={exp.title} onChange={e=>setExp({...exp,title:e.target.value})} placeholder="例如：烤肉晚餐"/></label><div className="two"><label>金額<input type="number" inputMode="decimal" value={exp.amount} onChange={e=>setExp({...exp,amount:e.target.value})}/></label><label>幣別<select value={exp.currency} onChange={e=>setExp({...exp,currency:e.target.value})}><option>{trip.currency}</option><option>TWD</option><option>USD</option></select></label></div><div className="two"><label>付款人<select value={exp.payerId} onChange={e=>setExp({...exp,payerId:e.target.value})}>{wallet.travelers.map(t=><option value={t.id} key={t.id}>{t.name}</option>)}</select></label><label>分類<select value={exp.category} onChange={e=>setExp({...exp,category:e.target.value})}><option>餐飲</option><option>交通</option><option>住宿</option><option>門票</option><option>購物</option><option>其他</option></select></label></div><label>日期<input type="date" value={exp.date} onChange={e=>setExp({...exp,date:e.target.value})}/></label><fieldset><legend>參與分帳的人</legend>{wallet.travelers.map(t=><label className="person-check" key={t.id}><input type="checkbox" checked={exp.participantIds.includes(t.id)} onChange={e=>setExp({...exp,participantIds:e.target.checked?[...exp.participantIds,t.id]:exp.participantIds.filter(x=>x!==t.id)})}/>{t.name}</label>)}</fieldset><label>備註<textarea rows={3} value={exp.note} onChange={e=>setExp({...exp,note:e.target.value})}/></label><div className="sticky-actions"><button className="btn" onClick={()=>setExpenseOpen(false)}>取消</button><button className="btn primary" onClick={addExpense}>儲存消費</button></div></div></ModalShell>}
  </section>
 }
 
@@ -1517,6 +1527,10 @@ function App(){
  const [shareMessage,setShareMessage]=useState('')
  const [shortShareUrl,setShortShareUrl]=useState('')
  const [shareExpiryDays,setShareExpiryDays]=useState(30)
+ const [shareScope,setShareScope]=useState<ShareScope>('wallet')
+ const [sharePassword,setSharePassword]=useState('')
+ const [shareAccessPassword,setShareAccessPassword]=useState('')
+ const [shareNeedsPassword,setShareNeedsPassword]=useState(false)
  const [draggingItem,setDraggingItem]=useState<string|null>(null)
  const dragTimer=useRef<number|undefined>(undefined)
  const dragPointer=useRef<number|undefined>(undefined)
@@ -1561,10 +1575,15 @@ function App(){
   if(!shortShareCode)return
   let cancelled=false
   setShareLoadError('')
-  fetch(`/api/share/${encodeURIComponent(shortShareCode)}`)
+  fetch(`/api/share/${encodeURIComponent(shortShareCode)}`,{
+   headers:shareAccessPassword?{'x-share-password':shareAccessPassword}:{}
+  })
    .then(async response=>{
-    if(!response.ok){const body=await response.json().catch(()=>({}));throw new Error(body.error||'找不到這個分享行程')}
-    return response.json()
+    const body=await response.json().catch(()=>({}))
+    if(response.status===401){setShareNeedsPassword(true);throw new Error(body.error||'此分享需要密碼')}
+    if(!response.ok)throw new Error(body.error||'找不到這個分享行程')
+    setShareNeedsPassword(false)
+    return body
    })
    .then(payload=>{
     if(cancelled)return
@@ -1574,9 +1593,9 @@ function App(){
    })
    .catch(error=>{if(!cancelled)setShareLoadError(error?.message||'分享行程載入失敗')})
   return()=>{cancelled=true}
- },[shareLoadNonce])
+ },[shareLoadNonce,shareAccessPassword])
  useEffect(()=>{if(active&&!active.days.some(d=>d.id===tab))setTab(active.days[0]?.id||null)},[active?.id,active?.days.length])
- useEffect(()=>{setShortShareUrl('')},[active?.updated])
+ useEffect(()=>{setShortShareUrl('')},[active?.updated,shareScope,sharePassword,shareExpiryDays])
  const saveTrip=(v:any)=>{
   if(form&&form!==true){
    const p=profile(v.destination);const existing=form;let days=existing.days
@@ -1710,7 +1729,7 @@ function App(){
    const response=await fetch('/api/share',{
     method:'POST',
     headers:{'content-type':'application/json'},
-    body:JSON.stringify({trip:compactReadonlyTrip(active),expiresInDays:shareExpiryDays})
+    body:JSON.stringify({trip:compactReadonlyTrip(active,shareScope),expiresInDays:shareExpiryDays,scope:shareScope,password:sharePassword.trim()||undefined})
    })
    const payload=await response.json().catch(()=>({}))
    if(!response.ok)throw new Error(payload.error||'短網址建立失敗')
@@ -1813,7 +1832,8 @@ function App(){
     <small>TRAVEL PLANNER SHARE</small>
     <h1>{shareLoadError?'無法開啟分享行程':'正在載入唯讀旅行'}</h1>
     <p>{shareLoadError||`分享代碼：${shortShareCode}`}</p>
-    {shareLoadError&&<button className="btn primary" onClick={()=>setShareLoadNonce(value=>value+1)}>重新載入</button>}
+    {shareNeedsPassword&&<label className="share-unlock-field">分享密碼<input type="password" inputMode="numeric" value={shareAccessPassword} onChange={event=>setShareAccessPassword(event.target.value)} placeholder="輸入分享者設定的密碼"/></label>}
+    {shareLoadError&&<button className="btn primary" onClick={()=>setShareLoadNonce(value=>value+1)}>{shareNeedsPassword?'解鎖行程':'重新載入'}</button>}
    </section>
   </div>
  }
@@ -1885,7 +1905,13 @@ function App(){
     <section className="share-center">
      <article className="share-intro"><Share2 size={28}/><div><h3>{active.name}</h3><p>建立短網址後，親友只能查看，不能修改你的行程。</p></div></article>
      <label className="share-expiry">分享有效期限<select value={shareExpiryDays} onChange={event=>{setShareExpiryDays(Number(event.target.value));setShortShareUrl('')}}><option value={7}>7 天</option><option value={30}>30 天</option><option value={90}>90 天</option><option value={365}>1 年</option></select></label>
-     {shortShareUrl&&<div className="short-share-preview"><small>唯讀短網址</small><strong>{shortShareUrl}</strong><span>接收者只能觀看，無法新增、刪除或修改。</span></div>}
+     <fieldset className="share-scope-picker"><legend>親友可以查看的內容</legend>
+      <label><input type="radio" name="shareScope" checked={shareScope==='itinerary'} onChange={()=>setShareScope('itinerary')}/><span><b>僅行程</b><small>每日安排、航班、交通與便條</small></span></label>
+      <label><input type="radio" name="shareScope" checked={shareScope==='budget'} onChange={()=>setShareScope('budget')}/><span><b>行程＋預算</b><small>包含總預算、旅伴與手續費，不顯示消費明細</small></span></label>
+      <label><input type="radio" name="shareScope" checked={shareScope==='wallet'} onChange={()=>setShareScope('wallet')}/><span><b>行程＋完整錢包分帳</b><small>包含每筆支出、付款人、參與者與結算結果</small></span></label>
+     </fieldset>
+     <label className="share-password-field">分享密碼（選填）<input type="password" inputMode="numeric" maxLength={12} value={sharePassword} onChange={event=>setSharePassword(event.target.value)} placeholder="留空代表不需要密碼"/><small>設定後，親友需輸入密碼才能查看。</small></label>
+     {shortShareUrl&&<div className="short-share-preview"><small>唯讀短網址</small><strong>{shortShareUrl}</strong><span>{shareScope==='wallet'?'包含完整錢包與分帳':shareScope==='budget'?'包含預算摘要':'僅包含行程'}・接收者只能觀看。</span></div>}
      <button className="share-choice primary" disabled={shareBusy} onClick={shareReadonlyLink}><span>🔗</span><div><b>分享到 LINE／其他 App</b><small>傳送精簡的唯讀連結，對方可完整觀看但不能修改。</small></div></button>
      <button className="share-choice" disabled={shareBusy} onClick={copyReadonlyLink}><span>📋</span><div><b>複製唯讀連結</b><small>LINE 分享中斷時，可直接貼到好友聊天室。</small></div></button>
      <button className="share-choice yellow" disabled={shareBusy} onClick={shareTripPdf}><span>📄</span><div><b>{shareBusy?'正在製作 PDF…':'分享整份旅行 PDF'}</b><small>包含所有 Day 的行程，製作完成後再開啟 iPhone 分享選單。</small></div></button>
@@ -1904,7 +1930,7 @@ function App(){
   </div>
  }
 
- return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.2.1</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
+ return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.3.0</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
  {s.trips.length?<div className="grid">{s.trips.map(t=><article className={`trip-card theme-${t.theme}`} key={t.id}><button className="trip-cover" style={t.cover?{backgroundImage:`url(${t.cover})`}:{}} onClick={()=>{update({...s,active:t.id});setTab(t.days[0]?.id||null);setPage('home')}}><div><small>{t.country}</small><b>{t.destination}</b><span>{t.start} ～ {t.end}</span></div></button><div className="trip-info"><div><h3>{t.name}</h3><p>{t.currency}・{t.language}</p><small className="theme-name">{themes.find(x=>x.id===t.theme)?.name}</small></div><div className="icons"><button onClick={()=>setForm(t)}><Pencil size={17}/></button><button onClick={()=>duplicate(t)}><Copy size={17}/></button><button onClick={()=>remove(t)}><Trash2 size={17}/></button></div></div></article>)}</div>:<section className="card empty-home"><div>🧳</div><h2>建立第一本旅行手帳</h2><p>釜山、日本、泰國或任何目的地，都能建立獨立行程。</p><button className="btn primary" onClick={()=>setForm(true)}><Plus/>新增旅行</button><button className="btn" onClick={legacy}><Upload size={17}/>匯入舊版</button></section>}</main>
  {form&&<Form trip={form===true?undefined:form} onSave={saveTrip} onClose={()=>setForm(null)}/>}
  </div>
