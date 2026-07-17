@@ -1,8 +1,3 @@
-# Travel Planner Ultimate v3.5.1
+# Travel Planner Ultimate v3.5.2
 
-- 底部導覽列保持單排，可左右滑動。
-- 回憶圖示改為與其他導覽項目一致的線條圖示。
-- 完整旅行路線改用 OpenStreetMap 實際地圖。
-- 足跡路線與回放會覆蓋於地圖上。
-
-地圖底圖需要網路連線，行程地點需要包含經緯度。
+回憶足跡地圖改用 Leaflet，修正 iframe 與 SVG 投影不同造成的定位偏移。

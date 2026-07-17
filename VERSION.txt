@@ -1,7 +1,6 @@
 Travel Planner Ultimate
-Version: 3.5.1 — Memories Hotfix
+Version: 3.5.2 — Footprint Map Accuracy Fix
 
-- 底部選單固定單排並可左右滑動。
-- 回憶圖示改成一致的線條圖示。
-- 完整旅行路線改為 OpenStreetMap 實際地圖。
-- 保留路線、編號、完成狀態與回放。
+- 改用 Leaflet 真實地圖元件
+- 地圖、標記與路線共用相同座標系統
+- 修正縮放與平移後的定位偏移

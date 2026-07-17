@@ -2111,3 +2111,13 @@ form select{
 
 /* v3.5.1 memories hotfix */
 .bottom-nav{display:flex!important;flex-wrap:nowrap!important;justify-content:flex-start!important;overflow-x:auto!important;overflow-y:hidden!important;-webkit-overflow-scrolling:touch;scrollbar-width:none;overscroll-behavior-x:contain}.bottom-nav::-webkit-scrollbar{display:none}.bottom-nav button{flex:0 0 64px!important;min-width:64px!important;white-space:nowrap}.nav-emoji{display:none}.footprint-map{background:#e8eef0}.footprint-map-tiles{position:absolute;inset:0;width:100%;height:100%;border:0;filter:saturate(.82) contrast(.96) brightness(1.03);pointer-events:auto}.footprint-route-overlay{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;color:var(--primary);filter:drop-shadow(0 1px 0 rgba(255,255,255,.9))}.footprint-route-overlay g circle{fill:var(--paper);stroke:var(--ink);stroke-width:.85}.footprint-route-overlay g.done circle{fill:#7bd389}.footprint-route-overlay g.playing circle{fill:var(--accent)}.footprint-route-overlay text{fill:var(--ink);font-size:3px;font-weight:900}.memory-map-empty{z-index:3;background:color-mix(in srgb,var(--paper) 88%,transparent)}
+
+
+/* v3.5.2 — Accurate footprint positioning */
+.footprint-leaflet-map{position:absolute;inset:0;width:100%;height:100%;z-index:1}
+.footprint-map .leaflet-container{font-family:inherit;background:#e7edf0}
+.memory-leaflet-marker{display:grid;place-items:center;width:34px;height:34px;border:3px solid var(--ink);border-radius:50%;background:var(--paper);box-shadow:2px 2px 0 var(--ink);color:var(--ink);font-weight:900;font-size:14px}
+.memory-leaflet-marker.done{background:#7bd389}
+.memory-leaflet-marker.playing{background:var(--accent);animation:memory-leaflet-pulse .75s infinite alternate}
+@keyframes memory-leaflet-pulse{to{transform:scale(1.25)}}
+.footprint-map-tiles,.footprint-route-overlay{display:none!important}

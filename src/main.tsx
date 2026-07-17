@@ -1,3 +1,5 @@
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import React,{useEffect,useMemo,useRef,useState} from 'react'
 import ReactDOM from 'react-dom/client'
 import {
@@ -1504,21 +1506,47 @@ function TransportDetails({item}:{item:Item}){
 }
 
 
+function FootprintLeafletMap({points,replayIndex}:{points:{day:Day;item:Item;lat:number;lon:number;index:number}[];replayIndex:number}){
+ const hostRef=useRef<HTMLDivElement|null>(null)
+ const mapRef=useRef<L.Map|null>(null)
+ const layerRef=useRef<L.LayerGroup|null>(null)
+ useEffect(()=>{
+  if(!hostRef.current||mapRef.current)return
+  const map=L.map(hostRef.current,{zoomControl:true,attributionControl:true,scrollWheelZoom:false})
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map)
+  map.setView([23.7,120.9],6)
+  mapRef.current=map
+  return()=>{map.remove();mapRef.current=null}
+ },[])
+ useEffect(()=>{
+  const map=mapRef.current
+  if(!map)return
+  if(layerRef.current)layerRef.current.remove()
+  const group=L.layerGroup().addTo(map)
+  layerRef.current=group
+  const visible=points.filter(point=>replayIndex<0||point.index<=replayIndex)
+  if(visible.length>1)L.polyline(visible.map(point=>[point.lat,point.lon] as [number,number]),{weight:5,opacity:.9}).addTo(group)
+  points.forEach(point=>{
+   const safeTitle=point.item.title.replace(/[&<>\"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[s]||s))
+   const marker=L.marker([point.lat,point.lon],{icon:L.divIcon({className:'',html:`<div class="memory-leaflet-marker ${point.item.completed?'done':''} ${replayIndex===point.index?'playing':''}">${point.index+1}</div>`,iconSize:[34,34],iconAnchor:[17,17]}),opacity:replayIndex>=0&&point.index>replayIndex?.28:1}).addTo(group)
+   marker.bindTooltip(`<strong>${safeTitle}</strong><br>${point.day.date} ${point.item.start||''}`,{direction:'top',offset:[0,-16]})
+  })
+  if(points.length){
+   const bounds=L.latLngBounds(points.map(point=>[point.lat,point.lon] as [number,number]))
+   map.fitBounds(bounds,{padding:[30,30],maxZoom:15})
+   window.setTimeout(()=>map.invalidateSize(),80)
+  }
+ },[points,replayIndex])
+ return <div ref={hostRef} className="footprint-leaflet-map" aria-label="旅行足跡地圖"/>
+}
+
 function MemoriesCenter({trip,readOnly,onToggle,onSaveMemory}:{trip:Trip;readOnly:boolean;onToggle:(dayId:string,itemId:string)=>void;onSaveMemory:(dayId:string,memory:DayMemory)=>void}){
  const [selectedDay,setSelectedDay]=useState<string>('all')
  const [replayIndex,setReplayIndex]=useState(-1)
  const [draft,setDraft]=useState<DayMemory>({note:'',rating:5,photos:[]})
  const days=selectedDay==='all'?trip.days:trip.days.filter(day=>day.id===selectedDay)
  const points=days.flatMap(day=>day.items.filter(item=>item.lat!=null&&item.lon!=null).map(item=>({day,item,lat:Number(item.lat),lon:Number(item.lon)})))
- const minLat=Math.min(...points.map(point=>point.lat),trip.lat-0.01)
- const maxLat=Math.max(...points.map(point=>point.lat),trip.lat+0.01)
- const minLon=Math.min(...points.map(point=>point.lon),trip.lon-0.01)
- const maxLon=Math.max(...points.map(point=>point.lon),trip.lon+0.01)
- const xy=(lat:number,lon:number)=>({
-  x:8+84*((lon-minLon)/Math.max(.0001,maxLon-minLon)),
-  y:8+74*(1-(lat-minLat)/Math.max(.0001,maxLat-minLat))
- })
- const mapped=points.map((point,index)=>({...point,...xy(point.lat,point.lon),index}))
+ const mapped=points.map((point,index)=>({...point,index}))
  const selected=selectedDay==='all'?null:trip.days.find(day=>day.id===selectedDay)
  const memory=selected?(trip.memories?.[selected.id]||{note:'',rating:5,photos:[]}):null
  useEffect(()=>{if(memory)setDraft({...memory,photos:[...(memory.photos||[])]})},[selectedDay])
@@ -1559,20 +1587,7 @@ function MemoriesCenter({trip,readOnly,onToggle,onSaveMemory}:{trip:Trip;readOnl
   <article className="card footprint-map-card">
    <header><div><small>FOOTPRINT MAP</small><h3>{selectedDay==='all'?'完整旅行路線':selected?.title}</h3></div><button className="btn yellow" disabled={!mapped.length||replayIndex>=0} onClick={()=>setReplayIndex(0)}>▶ 回放</button></header>
    <div className="footprint-map">
-    {mapped.length>0&&<iframe
-      className="footprint-map-tiles"
-      title="旅行足跡地圖"
-      loading="lazy"
-      referrerPolicy="no-referrer-when-downgrade"
-      src={`https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(`${minLon-0.01},${minLat-0.01},${maxLon+0.01},${maxLat+0.01}`)}&layer=mapnik`}
-    />}
-    <svg className="footprint-route-overlay" viewBox="0 0 100 90" preserveAspectRatio="none">
-     {mapped.length>1&&<polyline points={mapped.filter(point=>replayIndex<0||point.index<=replayIndex).map(point=>`${point.x},${point.y}`).join(' ')} fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round"/>}
-     {mapped.map(point=><g key={`${point.day.id}-${point.item.id}`} className={`${point.item.completed?'done':''} ${replayIndex===point.index?'playing':''}`} opacity={replayIndex>=0&&point.index>replayIndex?.25:1}>
-      <circle cx={point.x} cy={point.y} r="3.8"/><text x={point.x} y={point.y+1.3} textAnchor="middle">{point.index+1}</text>
-     </g>)}
-    </svg>
-    {!mapped.length&&<div className="memory-map-empty">行程地點需要有經緯度，才會顯示地圖與足跡路線。</div>}
+    {mapped.length>0?<FootprintLeafletMap points={mapped} replayIndex={replayIndex}/>:<div className="memory-map-empty">行程地點需要有經緯度，才會顯示地圖與足跡路線。</div>}
    </div>
    <div className="footprint-legend">{mapped.map(point=><button key={point.item.id} className={point.item.completed?'completed':''} onClick={()=>!readOnly&&onToggle(point.day.id,point.item.id)}>
     <span>{point.item.completed?'✓':point.index+1}</span><div><b>{point.item.title}</b><small>{point.day.date}・{point.item.start||'未設定時間'}</small></div>
@@ -2198,7 +2213,7 @@ function App(){
   </div>
  }
 
- return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.5.1</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
+ return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.5.2</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
  {s.trips.length?<div className="grid">{s.trips.map(t=><article className={`trip-card theme-${t.theme}`} key={t.id}><button className="trip-cover" style={t.cover?{backgroundImage:`url(${t.cover})`}:{}} onClick={()=>{update({...s,active:t.id});setTab(t.days[0]?.id||null);setPage('home')}}><div><small>{t.country}</small><b>{t.destination}</b><span>{t.start} ～ {t.end}</span></div></button><div className="trip-info"><div><h3>{t.name}</h3><p>{t.currency}・{t.language}</p><small className="theme-name">{themes.find(x=>x.id===t.theme)?.name}</small></div><div className="icons"><button onClick={()=>setForm(t)}><Pencil size={17}/></button><button onClick={()=>duplicate(t)}><Copy size={17}/></button><button onClick={()=>remove(t)}><Trash2 size={17}/></button></div></div></article>)}</div>:<section className="card empty-home"><div>🧳</div><h2>建立第一本旅行手帳</h2><p>釜山、日本、泰國或任何目的地，都能建立獨立行程。</p><button className="btn primary" onClick={()=>setForm(true)}><Plus/>新增旅行</button><button className="btn" onClick={legacy}><Upload size={17}/>匯入舊版</button></section>}</main>
  {form&&<Form trip={form===true?undefined:form} onSave={saveTrip} onClose={()=>setForm(null)}/>}
  </div>
