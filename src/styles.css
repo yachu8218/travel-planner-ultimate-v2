@@ -2091,3 +2091,20 @@ form select{
 @media(max-width:420px){
   .pdf-style-picker,.pdf-export-actions{grid-template-columns:1fr}
 }
+
+/* =========================================================
+   v3.5.0 — Travel Memories
+   ========================================================= */
+.nav-emoji{font-size:20px;line-height:20px}.tool-emoji{font-size:25px}
+.memories-center{display:grid;gap:14px}.memories-hero{display:flex;align-items:center;justify-content:space-between;background:var(--primary)}.memories-hero h2,.memories-hero p{margin:3px 0}.memories-hero>span{font-size:52px}
+.memory-day-tabs{display:flex;gap:7px;overflow:auto;padding:2px 2px 7px}.memory-day-tabs button{flex:0 0 auto;padding:8px 12px;border:2px solid var(--ink);border-radius:999px;background:var(--paper);box-shadow:2px 2px 0 var(--ink);font-weight:900}.memory-day-tabs button.active{background:var(--secondary)}
+.footprint-map-card header,.memory-journal header{display:flex;align-items:center;justify-content:space-between;gap:10px}.footprint-map-card h3,.memory-journal h3{margin:3px 0}
+.footprint-map{position:relative;min-height:270px;margin:12px 0;border:3px solid var(--ink);border-radius:13px;overflow:hidden;background:color-mix(in srgb,var(--soft) 70%,white);color:var(--ink)}
+.footprint-map svg{display:block;width:100%;height:270px}.footprint-map g circle{fill:var(--paper);stroke:var(--ink);stroke-width:.8}.footprint-map g.done circle{fill:#7bd389}.footprint-map g.playing circle{fill:var(--accent);animation:memory-pulse .75s infinite alternate}.footprint-map text{font-size:3px;font-weight:900;pointer-events:none}
+@keyframes memory-pulse{to{transform:scale(1.45);transform-origin:center}}
+.memory-map-empty{position:absolute;inset:0;display:grid;place-items:center;padding:30px;text-align:center;font-weight:800}
+.footprint-legend{display:grid;gap:7px}.footprint-legend button{display:grid;grid-template-columns:34px minmax(0,1fr);align-items:center;gap:9px;width:100%;padding:8px;border:1.5px solid var(--ink);border-radius:9px;background:var(--paper);text-align:left}.footprint-legend button>span{display:grid;place-items:center;width:30px;height:30px;border:2px solid var(--ink);border-radius:50%;background:var(--soft);font-weight:900}.footprint-legend button.completed>span{background:#7bd389}.footprint-legend button div{display:grid}.footprint-legend small{font-size:9px;color:#66716e}
+.memory-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.memory-stats article{display:grid;justify-items:center;gap:3px;padding:11px!important}.memory-stats span{font-size:23px}.memory-stats b{font-size:17px}.memory-stats small{font-size:9px}
+.memory-stars{display:flex}.memory-stars button{padding:0 2px;border:0;background:transparent;color:#e5a600;font-size:21px}.memory-stars button:disabled{opacity:1}
+.memory-journal textarea{min-height:120px;margin-top:12px;resize:vertical}.memory-photos{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}.memory-photos>div{position:relative;aspect-ratio:1;border:2px solid var(--ink);border-radius:9px;overflow:hidden}.memory-photos img{width:100%;height:100%;object-fit:cover}.memory-photos button{position:absolute;right:3px;top:3px;width:24px;height:24px;border:1.5px solid var(--ink);border-radius:50%;background:white;font-weight:900}.memory-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:11px}
+@media(max-width:430px){.bottom-nav{overflow-x:auto;justify-content:flex-start}.bottom-nav button{min-width:56px}.memory-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.memory-photos{grid-template-columns:repeat(2,1fr)}}

@@ -12,7 +12,7 @@ import './styles.css'
 type TType='place'|'meal'|'hotel'|'transport'|'flight'|'note'
 type TransportMode='walk'|'metro'|'bus'|'taxi'|'car'|'train'|'flight'|'ferry'
 type ThemeId='summer'|'journal'|'sakura'|'forest'|'coast'|'lavender'|'neon'|'cafe'|'christmas'|'washi'|'lemon'|'peach'|'strawberry'|'orange'|'apple'|'sky'|'grape'|'rainbow'|'mint'|'sunny'
-type AppPage='home'|'itinerary'|'explore'|'wallet'|'translate'|'more'
+type AppPage='home'|'itinerary'|'explore'|'wallet'|'memories'|'translate'|'more'
 type Check={id:string,text:string,done:boolean}
 type Item={
  id:string,type:TType,start:string,end:string,title:string,note?:string,checks?:Check[],
@@ -24,8 +24,10 @@ type Item={
  departureScheduled?:string,arrivalScheduled?:string,flightUpdatedAt?:number,
  departureTerminal?:string,arrivalTerminal?:string,departureGate?:string,arrivalGate?:string,
  baggageBelt?:string,aircraftModel?:string,flightSource?:string,
- departureTimezone?:string,arrivalTimezone?:string,departureUtcOffset?:string,arrivalUtcOffset?:string
+ departureTimezone?:string,arrivalTimezone?:string,departureUtcOffset?:string,arrivalUtcOffset?:string,
+ completed?:boolean,completedAt?:number
 }
+type DayMemory={note:string;rating:number;photos:string[]}
 type Day={id:string,date:string,title:string,items:Item[]}
 type Traveler={id:string;name:string}
 type Expense={id:string;title:string;amount:number;currency:string;payerId:string;participantIds:string[];category:string;date:string;note?:string}
@@ -36,7 +38,7 @@ type PdfOptions={cover:boolean;tripInfo:boolean;flights:boolean;itinerary:boolea
 type LiveShareInfo={code:string;url:string;editToken:string;scope:ShareScope;expiresInDays:number;password:string;updatedAt:number}
 type Trip={
  id:string,name:string,destination:string,country:string,currency:string,language:string,locale:string,
- start:string,end:string,lat:number,lon:number,cover?:string,days:Day[],theme:ThemeId,wallet?:WalletData,favorites?:Item[],created:number,updated:number
+ start:string,end:string,lat:number,lon:number,cover?:string,days:Day[],theme:ThemeId,wallet?:WalletData,favorites?:Item[],memories?:Record<string,DayMemory>,created:number,updated:number
 }
 type State={version:2,active:string|null,trips:Trip[]}
 type WeatherDay={date:string,code:number,max:number,min:number,rain:number}
@@ -1501,11 +1503,93 @@ function TransportDetails({item}:{item:Item}){
  return <div className="transport-card"><div className="transport-title"><span>{modeEmoji[m]}</span><b>{modeLabel[m]}</b>{item.flightNo&&<strong>{item.flightNo}</strong>}{item.line&&<strong>{item.line}</strong>}</div>{(item.from||item.to)&&<div className="route"><span>{item.from||'出發地'}</span><b>→</b><span>{item.to||'抵達地'}</span></div>}<div className="transport-meta">{item.durationMin!=null&&<span><Clock3 size={15}/>{item.durationMin} 分鐘</span>}{item.distanceKm!=null&&<span><Ruler size={15}/>{item.distanceKm} 公里</span>}</div></div>
 }
 
+
+function MemoriesCenter({trip,readOnly,onToggle,onSaveMemory}:{trip:Trip;readOnly:boolean;onToggle:(dayId:string,itemId:string)=>void;onSaveMemory:(dayId:string,memory:DayMemory)=>void}){
+ const [selectedDay,setSelectedDay]=useState<string>('all')
+ const [replayIndex,setReplayIndex]=useState(-1)
+ const [draft,setDraft]=useState<DayMemory>({note:'',rating:5,photos:[]})
+ const days=selectedDay==='all'?trip.days:trip.days.filter(day=>day.id===selectedDay)
+ const points=days.flatMap(day=>day.items.filter(item=>item.lat!=null&&item.lon!=null).map(item=>({day,item,lat:Number(item.lat),lon:Number(item.lon)})))
+ const minLat=Math.min(...points.map(point=>point.lat),trip.lat-0.01)
+ const maxLat=Math.max(...points.map(point=>point.lat),trip.lat+0.01)
+ const minLon=Math.min(...points.map(point=>point.lon),trip.lon-0.01)
+ const maxLon=Math.max(...points.map(point=>point.lon),trip.lon+0.01)
+ const xy=(lat:number,lon:number)=>({
+  x:8+84*((lon-minLon)/Math.max(.0001,maxLon-minLon)),
+  y:8+74*(1-(lat-minLat)/Math.max(.0001,maxLat-minLat))
+ })
+ const mapped=points.map((point,index)=>({...point,...xy(point.lat,point.lon),index}))
+ const selected=selectedDay==='all'?null:trip.days.find(day=>day.id===selectedDay)
+ const memory=selected?(trip.memories?.[selected.id]||{note:'',rating:5,photos:[]}):null
+ useEffect(()=>{if(memory)setDraft({...memory,photos:[...(memory.photos||[])]})},[selectedDay])
+ useEffect(()=>{
+  if(replayIndex<0)return
+  if(replayIndex>=mapped.length){setReplayIndex(-1);return}
+  const timer=window.setTimeout(()=>setReplayIndex(value=>value+1),850)
+  return()=>window.clearTimeout(timer)
+ },[replayIndex,mapped.length])
+ const stats=useMemo(()=>{
+  const all=trip.days.flatMap(day=>day.items)
+  return{
+   places:all.filter(item=>item.type==='place').length,
+   meals:all.filter(item=>item.type==='meal').length,
+   transport:all.filter(item=>item.type==='transport').length,
+   flights:all.filter(item=>item.type==='flight').length,
+   completed:all.filter(item=>item.completed).length,
+   distance:Math.round(all.reduce((sum,item)=>sum+(item.distanceKm||0),0)*10)/10
+  }
+ },[trip.updated])
+ const addPhotos=(files:FileList|null)=>{
+  if(!files)return
+  Array.from(files).slice(0,6).forEach(file=>{
+   const reader=new FileReader()
+   reader.onload=()=>setDraft(current=>({...current,photos:[...current.photos,String(reader.result)].slice(0,12)}))
+   reader.readAsDataURL(file)
+  })
+ }
+ return <section className="memories-center">
+  <article className="card memories-hero">
+   <div><small>TRAVEL MEMORIES</small><h2>旅行足跡</h2><p>{trip.destination}・{trip.start} ～ {trip.end}</p></div>
+   <span>🌍</span>
+  </article>
+  <div className="memory-day-tabs">
+   <button className={selectedDay==='all'?'active':''} onClick={()=>setSelectedDay('all')}>整趟旅行</button>
+   {trip.days.map((day,index)=><button key={day.id} className={selectedDay===day.id?'active':''} onClick={()=>setSelectedDay(day.id)}>Day {index+1}</button>)}
+  </div>
+  <article className="card footprint-map-card">
+   <header><div><small>FOOTPRINT MAP</small><h3>{selectedDay==='all'?'完整旅行路線':selected?.title}</h3></div><button className="btn yellow" disabled={!mapped.length||replayIndex>=0} onClick={()=>setReplayIndex(0)}>▶ 回放</button></header>
+   <div className="footprint-map">
+    <svg viewBox="0 0 100 90" preserveAspectRatio="none">
+     <defs><pattern id="memory-grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth=".2" opacity=".16"/></pattern></defs>
+     <rect width="100" height="90" fill="url(#memory-grid)"/>
+     {mapped.length>1&&<polyline points={mapped.filter(point=>replayIndex<0||point.index<=replayIndex).map(point=>`${point.x},${point.y}`).join(' ')} fill="none" stroke="currentColor" strokeWidth="1.2" strokeDasharray="2 1.5"/>}
+     {mapped.map(point=><g key={`${point.day.id}-${point.item.id}`} className={`${point.item.completed?'done':''} ${replayIndex===point.index?'playing':''}`} opacity={replayIndex>=0&&point.index>replayIndex?.25:1}>
+      <circle cx={point.x} cy={point.y} r="3.5"/><text x={point.x} y={point.y+1.3} textAnchor="middle">{point.index+1}</text>
+     </g>)}
+    </svg>
+    {!mapped.length&&<div className="memory-map-empty">行程地點需要有經緯度，才會顯示足跡路線。</div>}
+   </div>
+   <div className="footprint-legend">{mapped.map(point=><button key={point.item.id} className={point.item.completed?'completed':''} onClick={()=>!readOnly&&onToggle(point.day.id,point.item.id)}>
+    <span>{point.item.completed?'✓':point.index+1}</span><div><b>{point.item.title}</b><small>{point.day.date}・{point.item.start||'未設定時間'}</small></div>
+   </button>)}</div>
+  </article>
+  <section className="memory-stats">
+   {[['📍','景點',stats.places],['🍽️','餐飲',stats.meals],['🚇','交通',stats.transport],['✈️','航班',stats.flights],['✅','已完成',stats.completed],['🛣️','紀錄距離',`${stats.distance} km`]].map(([icon,label,value])=><article className="card" key={String(label)}><span>{icon}</span><b>{value}</b><small>{label}</small></article>)}
+  </section>
+  {selected&&<article className="card memory-journal">
+   <header><div><small>DAY MEMORY</small><h3>{selected.date} 回憶日記</h3></div><div className="memory-stars">{[1,2,3,4,5].map(star=><button disabled={readOnly} key={star} onClick={()=>setDraft({...draft,rating:star})}>{star<=draft.rating?'★':'☆'}</button>)}</div></header>
+   <textarea readOnly={readOnly} value={draft.note} onChange={event=>setDraft({...draft,note:event.target.value})} placeholder="記錄今天最好玩的事、餐廳心得或旅行感想…"/>
+   <div className="memory-photos">{draft.photos.map((photo,index)=><div key={index}><img src={photo}/>{!readOnly&&<button onClick={()=>setDraft({...draft,photos:draft.photos.filter((_,i)=>i!==index)})}>×</button>}</div>)}</div>
+   {!readOnly&&<div className="memory-actions"><label className="btn">＋ 加入照片<input hidden multiple type="file" accept="image/*" onChange={event=>addPhotos(event.target.files)}/></label><button className="btn primary" onClick={()=>onSaveMemory(selected.id,draft)}>儲存回憶</button></div>}
+  </article>}
+ </section>
+}
+
 function BottomNav({page,onChange}:{page:AppPage,onChange:(p:AppPage)=>void}){
  const nav:[AppPage,React.ReactNode,string][]=[
   ['home',<House size={20}/>,'首頁'],['itinerary',<CalendarDays size={20}/>,'行程'],
   ['explore',<Compass size={20}/>,'探索'],['wallet',<WalletCards size={20}/>,'錢包'],
-  ['translate',<Languages size={20}/>,'翻譯'],['more',<UserRound size={20}/>,'我的']
+  ['memories',<span className="nav-emoji">🌍</span>,'回憶'],['translate',<Languages size={20}/>,'翻譯'],['more',<UserRound size={20}/>,'我的']
  ]
  return <nav className="bottom-nav">{nav.map(([p,icon,label])=><button key={p} className={page===p?'active':''} onClick={()=>onChange(p)}>{icon}<span>{label}</span></button>)}</nav>
 }
@@ -1565,6 +1649,16 @@ function App(){
  const active=s.trips.find(t=>t.id===s.active)||null
  const update=(n:State)=>{setS(n);if(!readOnly)save(n)}
  const updateWallet=(w:WalletData)=>{if(!active)return;const t={...active,wallet:w,updated:Date.now()};update({...s,trips:s.trips.map(x=>x.id===t.id?t:x)})}
+ const toggleCompleted=(dayId:string,itemId:string)=>{
+  if(!active||readOnly)return
+  const t={...active,days:active.days.map(day=>day.id!==dayId?day:{...day,items:day.items.map(item=>item.id!==itemId?item:{...item,completed:!item.completed,completedAt:!item.completed?Date.now():undefined})}),updated:Date.now()}
+  update({...s,trips:s.trips.map(trip=>trip.id===t.id?t:trip)})
+ }
+ const saveDayMemory=(dayId:string,memory:DayMemory)=>{
+  if(!active||readOnly)return
+  const t={...active,memories:{...(active.memories||{}),[dayId]:memory},updated:Date.now()}
+  update({...s,trips:s.trips.map(trip=>trip.id===t.id?t:trip)})
+ }
  const addFavorite=(item:Item)=>{
   if(!active)return
   const favorites=active.favorites||[]
@@ -2034,12 +2128,13 @@ function App(){
     </>}
     {page==='itinerary'&&itinerary}
     {page==='explore'&&<ExploreCenter trip={active} onAdd={addToCurrentDay} onFavorite={addFavorite} onRemoveFavorite={removeFavorite}/>}
-    {page==='wallet'&&<WalletCenter trip={active} onChange={updateWallet}/>}
+    {page==='wallet'&&<WalletCenter trip={active} onChange={updateWallet} readOnly={readOnly}/>}
+    {page==='memories'&&<MemoriesCenter trip={active} readOnly={readOnly} onToggle={toggleCompleted} onSaveMemory={saveDayMemory}/>}
     {page==='translate'&&<TranslateCenter trip={active}/>}
     {page==='more'&&<><article className="card connector-setting">
  <div><small>ITINERARY STYLE</small><h3>行程連接小插畫</h3><p>在每個行程之間顯示飛機、餐盤、地鐵等小插畫。</p></div>
  <button className={showConnectors?'toggle-switch active':'toggle-switch'} onClick={()=>{const next=!showConnectors;setShowConnectors(next);localStorage.setItem('travel-planner-show-connectors',String(next))}} aria-label="切換行程小插畫"><i/></button>
-</article><section className="tools-grid"><button className="card tool-card" onClick={()=>setForm(active)}><Palette/><b>主題風格</b><span>20 種官方主題</span></button><button className="card tool-card" onClick={()=>setPdfOpen(true)}><FileDown/><b>旅行手冊</b><span>自選內容・App 樣式 PDF</span></button><button className="card tool-card" onClick={()=>setFlightOpen(true)}><Plane/><b>航班中心</b><span>查詢或手動建立航班</span></button><button className="card tool-card" onClick={()=>setTransitOpen(true)}><Compass/><b>交通中心</b><span>建立地鐵、公車與步行路線</span></button><button className="card tool-card" onClick={()=>setWeatherOpen(true)}><CloudSun/><b>天氣中心</b><span>七天天氣與手動更新</span></button></section></>}
+</article><section className="tools-grid"><button className="card tool-card" onClick={()=>setForm(active)}><Palette/><b>主題風格</b><span>20 種官方主題</span></button><button className="card tool-card" onClick={()=>setPdfOpen(true)}><FileDown/><b>旅行手冊</b><span>自選內容・App 樣式 PDF</span></button><button className="card tool-card" onClick={()=>setPage('memories')}><span className="tool-emoji">🌍</span><b>旅行足跡</b><span>路線、打卡、統計與回憶日記</span></button><button className="card tool-card" onClick={()=>setFlightOpen(true)}><Plane/><b>航班中心</b><span>查詢或手動建立航班</span></button><button className="card tool-card" onClick={()=>setTransitOpen(true)}><Compass/><b>交通中心</b><span>建立地鐵、公車與步行路線</span></button><button className="card tool-card" onClick={()=>setWeatherOpen(true)}><CloudSun/><b>天氣中心</b><span>七天天氣與手動更新</span></button></section></>}
    </main>
    {shareOpen&&<ModalShell title="分享旅行" onClose={()=>setShareOpen(false)}>
     <section className="share-center">
@@ -2098,7 +2193,7 @@ function App(){
   </div>
  }
 
- return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.4.0</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
+ return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.5.0</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
  {s.trips.length?<div className="grid">{s.trips.map(t=><article className={`trip-card theme-${t.theme}`} key={t.id}><button className="trip-cover" style={t.cover?{backgroundImage:`url(${t.cover})`}:{}} onClick={()=>{update({...s,active:t.id});setTab(t.days[0]?.id||null);setPage('home')}}><div><small>{t.country}</small><b>{t.destination}</b><span>{t.start} ～ {t.end}</span></div></button><div className="trip-info"><div><h3>{t.name}</h3><p>{t.currency}・{t.language}</p><small className="theme-name">{themes.find(x=>x.id===t.theme)?.name}</small></div><div className="icons"><button onClick={()=>setForm(t)}><Pencil size={17}/></button><button onClick={()=>duplicate(t)}><Copy size={17}/></button><button onClick={()=>remove(t)}><Trash2 size={17}/></button></div></div></article>)}</div>:<section className="card empty-home"><div>🧳</div><h2>建立第一本旅行手帳</h2><p>釜山、日本、泰國或任何目的地，都能建立獨立行程。</p><button className="btn primary" onClick={()=>setForm(true)}><Plus/>新增旅行</button><button className="btn" onClick={legacy}><Upload size={17}/>匯入舊版</button></section>}</main>
  {form&&<Form trip={form===true?undefined:form} onSave={saveTrip} onClose={()=>setForm(null)}/>}
  </div>
