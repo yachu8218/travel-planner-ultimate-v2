@@ -1,6 +1,9 @@
 Travel Planner Ultimate
-Version: 3.5.2 — Footprint Map Accuracy Fix
+Version: 3.6.0 — Travel Map Engine
 
-- 改用 Leaflet 真實地圖元件
-- 地圖、標記與路線共用相同座標系統
-- 修正縮放與平移後的定位偏移
+- 回憶足跡改為真正的 Leaflet Marker 與 Polyline
+- 新增智慧校正定位，依店名、地址與目的地重新搜尋
+- 校正結果會寫回行程資料
+- 起點、終點與中繼站使用不同標記
+- 地圖與景點清單雙向定位
+- 回放時地圖會逐站移動並顯示資訊
