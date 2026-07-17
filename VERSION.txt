@@ -1,9 +1,9 @@
 Travel Planner Ultimate
-Version: 3.6.0 — Travel Map Engine
+Version: 3.6.0 — Footprint Map Rewrite
 
-- 回憶足跡改為真正的 Leaflet Marker 與 Polyline
-- 新增智慧校正定位，依店名、地址與目的地重新搜尋
-- 校正結果會寫回行程資料
-- 起點、終點與中繼站使用不同標記
-- 地圖與景點清單雙向定位
-- 回放時地圖會逐站移動並顯示資訊
+- 重寫 Leaflet 足跡地圖
+- 使用 CircleMarker，避免預設圖示或圖片樣式衝突
+- 精準經緯度標記與 Polyline 路線
+- 點選清單可定位景點
+- 新增 Google Places 定位校正
+- 保留每日／整趟旅行及回放功能

@@ -1,0 +1,24 @@
+{
+  "name": "旅行手帳 Travel Planner Ultimate 3.6.0",
+  "short_name": "旅行手帳",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f0df",
+  "theme_color": "#79b9ad",
+  "lang": "zh-Hant",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "description": "重寫回憶足跡地圖，加入精準標記、路線同步與定位校正"
+}
