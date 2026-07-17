@@ -1559,15 +1559,20 @@ function MemoriesCenter({trip,readOnly,onToggle,onSaveMemory}:{trip:Trip;readOnl
   <article className="card footprint-map-card">
    <header><div><small>FOOTPRINT MAP</small><h3>{selectedDay==='all'?'完整旅行路線':selected?.title}</h3></div><button className="btn yellow" disabled={!mapped.length||replayIndex>=0} onClick={()=>setReplayIndex(0)}>▶ 回放</button></header>
    <div className="footprint-map">
-    <svg viewBox="0 0 100 90" preserveAspectRatio="none">
-     <defs><pattern id="memory-grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth=".2" opacity=".16"/></pattern></defs>
-     <rect width="100" height="90" fill="url(#memory-grid)"/>
-     {mapped.length>1&&<polyline points={mapped.filter(point=>replayIndex<0||point.index<=replayIndex).map(point=>`${point.x},${point.y}`).join(' ')} fill="none" stroke="currentColor" strokeWidth="1.2" strokeDasharray="2 1.5"/>}
+    {mapped.length>0&&<iframe
+      className="footprint-map-tiles"
+      title="旅行足跡地圖"
+      loading="lazy"
+      referrerPolicy="no-referrer-when-downgrade"
+      src={`https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(`${minLon-0.01},${minLat-0.01},${maxLon+0.01},${maxLat+0.01}`)}&layer=mapnik`}
+    />}
+    <svg className="footprint-route-overlay" viewBox="0 0 100 90" preserveAspectRatio="none">
+     {mapped.length>1&&<polyline points={mapped.filter(point=>replayIndex<0||point.index<=replayIndex).map(point=>`${point.x},${point.y}`).join(' ')} fill="none" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" strokeLinejoin="round"/>}
      {mapped.map(point=><g key={`${point.day.id}-${point.item.id}`} className={`${point.item.completed?'done':''} ${replayIndex===point.index?'playing':''}`} opacity={replayIndex>=0&&point.index>replayIndex?.25:1}>
-      <circle cx={point.x} cy={point.y} r="3.5"/><text x={point.x} y={point.y+1.3} textAnchor="middle">{point.index+1}</text>
+      <circle cx={point.x} cy={point.y} r="3.8"/><text x={point.x} y={point.y+1.3} textAnchor="middle">{point.index+1}</text>
      </g>)}
     </svg>
-    {!mapped.length&&<div className="memory-map-empty">行程地點需要有經緯度，才會顯示足跡路線。</div>}
+    {!mapped.length&&<div className="memory-map-empty">行程地點需要有經緯度，才會顯示地圖與足跡路線。</div>}
    </div>
    <div className="footprint-legend">{mapped.map(point=><button key={point.item.id} className={point.item.completed?'completed':''} onClick={()=>!readOnly&&onToggle(point.day.id,point.item.id)}>
     <span>{point.item.completed?'✓':point.index+1}</span><div><b>{point.item.title}</b><small>{point.day.date}・{point.item.start||'未設定時間'}</small></div>
@@ -1589,7 +1594,7 @@ function BottomNav({page,onChange}:{page:AppPage,onChange:(p:AppPage)=>void}){
  const nav:[AppPage,React.ReactNode,string][]=[
   ['home',<House size={20}/>,'首頁'],['itinerary',<CalendarDays size={20}/>,'行程'],
   ['explore',<Compass size={20}/>,'探索'],['wallet',<WalletCards size={20}/>,'錢包'],
-  ['memories',<span className="nav-emoji">🌍</span>,'回憶'],['translate',<Languages size={20}/>,'翻譯'],['more',<UserRound size={20}/>,'我的']
+  ['memories',<Heart size={20}/>,'回憶'],['translate',<Languages size={20}/>,'翻譯'],['more',<UserRound size={20}/>,'我的']
  ]
  return <nav className="bottom-nav">{nav.map(([p,icon,label])=><button key={p} className={page===p?'active':''} onClick={()=>onChange(p)}>{icon}<span>{label}</span></button>)}</nav>
 }
@@ -2193,7 +2198,7 @@ function App(){
   </div>
  }
 
- return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.5.0</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
+ return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.5.1</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
  {s.trips.length?<div className="grid">{s.trips.map(t=><article className={`trip-card theme-${t.theme}`} key={t.id}><button className="trip-cover" style={t.cover?{backgroundImage:`url(${t.cover})`}:{}} onClick={()=>{update({...s,active:t.id});setTab(t.days[0]?.id||null);setPage('home')}}><div><small>{t.country}</small><b>{t.destination}</b><span>{t.start} ～ {t.end}</span></div></button><div className="trip-info"><div><h3>{t.name}</h3><p>{t.currency}・{t.language}</p><small className="theme-name">{themes.find(x=>x.id===t.theme)?.name}</small></div><div className="icons"><button onClick={()=>setForm(t)}><Pencil size={17}/></button><button onClick={()=>duplicate(t)}><Copy size={17}/></button><button onClick={()=>remove(t)}><Trash2 size={17}/></button></div></div></article>)}</div>:<section className="card empty-home"><div>🧳</div><h2>建立第一本旅行手帳</h2><p>釜山、日本、泰國或任何目的地，都能建立獨立行程。</p><button className="btn primary" onClick={()=>setForm(true)}><Plus/>新增旅行</button><button className="btn" onClick={legacy}><Upload size={17}/>匯入舊版</button></section>}</main>
  {form&&<Form trip={form===true?undefined:form} onSave={saveTrip} onClose={()=>setForm(null)}/>}
  </div>

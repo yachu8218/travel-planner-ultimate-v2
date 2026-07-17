@@ -1,5 +1,5 @@
 {
-  "name": "旅行手帳 Travel Planner Ultimate 3.5.0",
+  "name": "旅行手帳 Travel Planner Ultimate 3.5.1",
   "short_name": "旅行手帳",
   "start_url": "/",
   "display": "standalone",
@@ -20,5 +20,5 @@
       "purpose": "any maskable"
     }
   ],
-  "description": "旅行足跡、景點打卡、統計與回憶日記"
+  "description": "修正回憶頁地圖、底部導覽與圖示一致性"
 }
