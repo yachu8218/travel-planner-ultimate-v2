@@ -61,10 +61,6 @@ export default function AtlasMap({points,selectedId,replayIndex,onSelect}:Props)
   const group=L.layerGroup().addTo(map)
   layerRef.current=group
   markersRef.current.clear()
-  const visible=cleanPoints.filter(point=>replayIndex<0||point.index<=replayIndex)
-  if(visible.length>1){
-   L.polyline(visible.map(point=>[point.lat,point.lon] as [number,number]),{color:'#a45a7a',weight:4,opacity:.86,lineCap:'round',lineJoin:'round'}).addTo(group)
-  }
   cleanPoints.forEach((point,position)=>{
    const hidden=replayIndex>=0&&point.index>replayIndex
    const marker=L.marker([point.lat,point.lon],{icon:markerIcon(point,position,cleanPoints.length,selectedId===point.id,hidden),opacity:hidden?.28:1})

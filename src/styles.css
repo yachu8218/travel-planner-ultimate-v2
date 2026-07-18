@@ -2160,3 +2160,14 @@ form select{
 .atlas-locate:disabled{opacity:.65}
 .footprint-map>svg,.footprint-map>.footprint-route-overlay,.footprint-map>.footprint-map-tiles{display:none!important}
 .atlas-marker>span{display:block;transform:rotate(45deg);font-size:12px}
+
+
+/* =========================================================
+   Atlas Debug 1 — marker-only isolation test
+   Disable every Leaflet SVG/canvas overlay to identify the
+   blue/yellow block. Tile layer, markers and popups remain.
+   ========================================================= */
+.atlas-map .leaflet-overlay-pane,
+.atlas-map .leaflet-overlay-pane svg,
+.atlas-map .leaflet-overlay-pane canvas{display:none!important;visibility:hidden!important;width:0!important;height:0!important}
+.atlas-map svg,.atlas-map canvas{max-width:none!important;max-height:none!important}
