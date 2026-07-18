@@ -1,5 +1,3 @@
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
 import React,{useEffect,useMemo,useRef,useState} from 'react'
 import ReactDOM from 'react-dom/client'
 import {
@@ -8,6 +6,7 @@ import {
  Languages,UserRound,RefreshCw,Plane,MapPin,CloudSun,CheckCircle2,MoreHorizontal,
  ArrowUp,ArrowDown,X,Search,Navigation,Phone,Globe2,ImagePlus,Ticket,ReceiptText,Star,NotebookPen,Heart,HeartOff
 } from 'lucide-react'
+import AtlasMap from './components/AtlasMap'
 import {compressToEncodedURIComponent,decompressFromEncodedURIComponent} from 'lz-string'
 import './styles.css'
 
@@ -1506,44 +1505,20 @@ function TransportDetails({item}:{item:Item}){
 }
 
 
-function FootprintLeafletMap({points,replayIndex}:{points:{day:Day;item:Item;lat:number;lon:number;index:number}[];replayIndex:number}){
- const hostRef=useRef<HTMLDivElement|null>(null)
- const mapRef=useRef<L.Map|null>(null)
- const layerRef=useRef<L.LayerGroup|null>(null)
- useEffect(()=>{
-  if(!hostRef.current||mapRef.current)return
-  const map=L.map(hostRef.current,{zoomControl:true,attributionControl:true,scrollWheelZoom:false})
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map)
-  map.setView([23.7,120.9],6)
-  mapRef.current=map
-  return()=>{map.remove();mapRef.current=null}
- },[])
- useEffect(()=>{
-  const map=mapRef.current
-  if(!map)return
-  if(layerRef.current)layerRef.current.remove()
-  const group=L.layerGroup().addTo(map)
-  layerRef.current=group
-  const visible=points.filter(point=>replayIndex<0||point.index<=replayIndex)
-  if(visible.length>1)L.polyline(visible.map(point=>[point.lat,point.lon] as [number,number]),{weight:5,opacity:.9}).addTo(group)
-  points.forEach(point=>{
-   const safeTitle=point.item.title.replace(/[&<>\"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[s]||s))
-   const marker=L.marker([point.lat,point.lon],{icon:L.divIcon({className:'',html:`<div class="memory-leaflet-marker ${point.item.completed?'done':''} ${replayIndex===point.index?'playing':''}">${point.index+1}</div>`,iconSize:[34,34],iconAnchor:[17,17]}),opacity:replayIndex>=0&&point.index>replayIndex?.28:1}).addTo(group)
-   marker.bindTooltip(`<strong>${safeTitle}</strong><br>${point.day.date} ${point.item.start||''}`,{direction:'top',offset:[0,-16]})
-  })
-  if(points.length){
-   const bounds=L.latLngBounds(points.map(point=>[point.lat,point.lon] as [number,number]))
-   map.fitBounds(bounds,{padding:[30,30],maxZoom:15})
-   window.setTimeout(()=>map.invalidateSize(),80)
-  }
- },[points,replayIndex])
- return <div ref={hostRef} className="footprint-leaflet-map" aria-label="旅行足跡地圖"/>
+function FootprintLeafletMap({points,replayIndex,selectedId,onSelect}:{
+ points:{day:Day;item:Item;lat:number;lon:number;index:number}[];
+ replayIndex:number;selectedId:string|null;onSelect:(id:string)=>void
+}){
+ return <AtlasMap points={points.map(point=>({id:point.item.id,title:point.item.title,address:point.item.address,date:point.day.date,time:point.item.start,lat:point.lat,lon:point.lon,index:point.index,completed:point.item.completed}))} selectedId={selectedId} replayIndex={replayIndex} onSelect={onSelect}/>
 }
 
-function MemoriesCenter({trip,readOnly,onToggle,onSaveMemory}:{trip:Trip;readOnly:boolean;onToggle:(dayId:string,itemId:string)=>void;onSaveMemory:(dayId:string,memory:DayMemory)=>void}){
+
+function MemoriesCenter({trip,readOnly,onToggle,onSaveMemory,onCalibrate}:{trip:Trip;readOnly:boolean;onToggle:(dayId:string,itemId:string)=>void;onSaveMemory:(dayId:string,memory:DayMemory)=>void;onCalibrate:(points:{day:Day;item:Item}[])=>Promise<void>}){
  const [selectedDay,setSelectedDay]=useState<string>('all')
  const [replayIndex,setReplayIndex]=useState(-1)
  const [draft,setDraft]=useState<DayMemory>({note:'',rating:5,photos:[]})
+ const [selectedPointId,setSelectedPointId]=useState<string|null>(null)
+ const [calibrating,setCalibrating]=useState(false)
  const days=selectedDay==='all'?trip.days:trip.days.filter(day=>day.id===selectedDay)
  const points=days.flatMap(day=>day.items.filter(item=>item.lat!=null&&item.lon!=null).map(item=>({day,item,lat:Number(item.lat),lon:Number(item.lon)})))
  const mapped=points.map((point,index)=>({...point,index}))
@@ -1585,11 +1560,11 @@ function MemoriesCenter({trip,readOnly,onToggle,onSaveMemory}:{trip:Trip;readOnl
    {trip.days.map((day,index)=><button key={day.id} className={selectedDay===day.id?'active':''} onClick={()=>setSelectedDay(day.id)}>Day {index+1}</button>)}
   </div>
   <article className="card footprint-map-card">
-   <header><div><small>FOOTPRINT MAP</small><h3>{selectedDay==='all'?'完整旅行路線':selected?.title}</h3></div><button className="btn yellow" disabled={!mapped.length||replayIndex>=0} onClick={()=>setReplayIndex(0)}>▶ 回放</button></header>
+   <header><div><small>FOOTPRINT MAP</small><h3>{selectedDay==='all'?'完整旅行路線':selected?.title}</h3></div><div className="footprint-actions">{!readOnly&&<button className="btn" disabled={calibrating||!days.some(day=>day.items.some(item=>item.type==='place'||item.type==='meal'||item.type==='hotel'))} onClick={async()=>{setCalibrating(true);try{await onCalibrate(days.flatMap(day=>day.items.map(item=>({day,item}))))}finally{setCalibrating(false)}}}>{calibrating?'定位校正中…':'校正定位'}</button>}<button className="btn yellow" disabled={!mapped.length||replayIndex>=0} onClick={()=>setReplayIndex(0)}>▶ 回放</button></div></header>
    <div className="footprint-map">
-    {mapped.length>0?<FootprintLeafletMap points={mapped} replayIndex={replayIndex}/>:<div className="memory-map-empty">行程地點需要有經緯度，才會顯示地圖與足跡路線。</div>}
+    {mapped.length>0?<FootprintLeafletMap points={mapped} replayIndex={replayIndex} selectedId={selectedPointId} onSelect={setSelectedPointId}/>:<div className="memory-map-empty">行程地點需要有經緯度，才會顯示地圖與足跡路線。</div>}
    </div>
-   <div className="footprint-legend">{mapped.map(point=><button key={point.item.id} className={point.item.completed?'completed':''} onClick={()=>!readOnly&&onToggle(point.day.id,point.item.id)}>
+   <div className="footprint-legend">{mapped.map(point=><button key={point.item.id} className={`${point.item.completed?'completed':''} ${selectedPointId===point.item.id?'selected':''}`} onClick={()=>setSelectedPointId(point.item.id)} onDoubleClick={()=>!readOnly&&onToggle(point.day.id,point.item.id)}>
     <span>{point.item.completed?'✓':point.index+1}</span><div><b>{point.item.title}</b><small>{point.day.date}・{point.item.start||'未設定時間'}</small></div>
    </button>)}</div>
   </article>
@@ -1679,6 +1654,31 @@ function App(){
   const t={...active,memories:{...(active.memories||{}),[dayId]:memory},updated:Date.now()}
   update({...s,trips:s.trips.map(trip=>trip.id===t.id?t:trip)})
  }
+ const calibrateMemoryPoints=async(entries:{day:Day;item:Item}[])=>{
+  if(!active)return
+  const candidates=entries.filter(({item})=>['place','meal','hotel'].includes(item.type)&&item.title.trim())
+  if(!candidates.length){alert('目前沒有可校正的景點。');return}
+  const corrections=new Map<string,{lat:number;lon:number;address?:string;placeSource?:string}>()
+  let corrected=0
+  for(const {item} of candidates){
+   try{
+    const query=[item.title,item.address,active.destination,active.country].filter(Boolean).join(' ')
+    const response=await fetch(`/api/places?q=${encodeURIComponent(query)}&language=${encodeURIComponent(active.locale)}&destination=${encodeURIComponent(active.destination)}`)
+    const payload=await response.json()
+    const results=(payload.results||[]) as PlaceResult[]
+    const exact=results.find(result=>result.name?.toLowerCase()===item.title.trim().toLowerCase())||results[0]
+    if(exact&&Number.isFinite(Number(exact.lat))&&Number.isFinite(Number(exact.lon))){
+     corrections.set(item.id,{lat:Number(exact.lat),lon:Number(exact.lon),address:exact.display_name||item.address,placeSource:exact.source||'Google Places'})
+     corrected++
+    }
+   }catch{}
+  }
+  if(!corrections.size){alert('定位校正失敗。請確認 Cloudflare 已設定 GOOGLE_PLACES_API_KEY，或重新編輯景點並從搜尋結果選取。');return}
+  const updatedTrip={...active,days:active.days.map(day=>({...day,items:day.items.map(item=>corrections.has(item.id)?{...item,...corrections.get(item.id)!}:item)})),updated:Date.now()}
+  update({...s,trips:s.trips.map(trip=>trip.id===updatedTrip.id?updatedTrip:trip)})
+  alert(`已重新校正 ${corrected} 個景點定位。`)
+ }
+
  const addFavorite=(item:Item)=>{
   if(!active)return
   const favorites=active.favorites||[]
@@ -2149,7 +2149,7 @@ function App(){
     {page==='itinerary'&&itinerary}
     {page==='explore'&&<ExploreCenter trip={active} onAdd={addToCurrentDay} onFavorite={addFavorite} onRemoveFavorite={removeFavorite}/>}
     {page==='wallet'&&<WalletCenter trip={active} onChange={updateWallet} readOnly={readOnly}/>}
-    {page==='memories'&&<MemoriesCenter trip={active} readOnly={readOnly} onToggle={toggleCompleted} onSaveMemory={saveDayMemory}/>}
+    {page==='memories'&&<MemoriesCenter trip={active} readOnly={readOnly} onToggle={toggleCompleted} onSaveMemory={saveDayMemory} onCalibrate={calibrateMemoryPoints}/>}
     {page==='translate'&&<TranslateCenter trip={active}/>}
     {page==='more'&&<><article className="card connector-setting">
  <div><small>ITINERARY STYLE</small><h3>行程連接小插畫</h3><p>在每個行程之間顯示飛機、餐盤、地鐵等小插畫。</p></div>
@@ -2213,7 +2213,7 @@ function App(){
   </div>
  }
 
- return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.5.2</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
+ return <div className="app theme-summer"><header className="dash-head"><span className="stamp">ULTIMATE 3.6.0 ATLAS</span><h1>我的旅行手帳</h1><p>把每一次出發，收進自己的旅行書櫃。</p></header><main className="content"><div className="section"><div><small>MY JOURNEYS</small><h2>旅行書櫃</h2></div><button className="btn primary" onClick={()=>setForm(true)}><Plus size={18}/>新增旅行</button></div>
  {s.trips.length?<div className="grid">{s.trips.map(t=><article className={`trip-card theme-${t.theme}`} key={t.id}><button className="trip-cover" style={t.cover?{backgroundImage:`url(${t.cover})`}:{}} onClick={()=>{update({...s,active:t.id});setTab(t.days[0]?.id||null);setPage('home')}}><div><small>{t.country}</small><b>{t.destination}</b><span>{t.start} ～ {t.end}</span></div></button><div className="trip-info"><div><h3>{t.name}</h3><p>{t.currency}・{t.language}</p><small className="theme-name">{themes.find(x=>x.id===t.theme)?.name}</small></div><div className="icons"><button onClick={()=>setForm(t)}><Pencil size={17}/></button><button onClick={()=>duplicate(t)}><Copy size={17}/></button><button onClick={()=>remove(t)}><Trash2 size={17}/></button></div></div></article>)}</div>:<section className="card empty-home"><div>🧳</div><h2>建立第一本旅行手帳</h2><p>釜山、日本、泰國或任何目的地，都能建立獨立行程。</p><button className="btn primary" onClick={()=>setForm(true)}><Plus/>新增旅行</button><button className="btn" onClick={legacy}><Upload size={17}/>匯入舊版</button></section>}</main>
  {form&&<Form trip={form===true?undefined:form} onSave={saveTrip} onClose={()=>setForm(null)}/>}
  </div>

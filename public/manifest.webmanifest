@@ -1,5 +1,5 @@
 {
-  "name": "旅行手帳 Travel Planner Ultimate 3.5.2",
+  "name": "旅行手帳 Travel Planner Ultimate 3.6.0 Atlas Alpha",
   "short_name": "旅行手帳",
   "start_url": "/",
   "display": "standalone",
@@ -20,5 +20,5 @@
       "purpose": "any maskable"
     }
   ],
-  "description": "修正回憶足跡地圖的景點定位與路線偏移"
+  "description": "重寫回憶足跡地圖，加入精準標記、路線同步與定位校正"
 }

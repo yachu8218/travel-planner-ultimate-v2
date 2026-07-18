@@ -2121,3 +2121,42 @@ form select{
 .memory-leaflet-marker.playing{background:var(--accent);animation:memory-leaflet-pulse .75s infinite alternate}
 @keyframes memory-leaflet-pulse{to{transform:scale(1.25)}}
 .footprint-map-tiles,.footprint-route-overlay{display:none!important}
+
+
+/* =========================================================
+   v3.6.0 — rewritten footprint map
+   ========================================================= */
+.footprint-map{height:clamp(300px,48vh,480px);min-height:300px;background:#e9efed;isolation:isolate}
+.footprint-leaflet-map,.footprint-map .leaflet-container{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;z-index:1!important}
+.footprint-map .leaflet-pane,.footprint-map .leaflet-control{font-family:inherit}
+.footprint-map .leaflet-tile{max-width:none!important;max-height:none!important;padding:0!important;margin:0!important;border:0!important;box-shadow:none!important;object-fit:unset!important}
+.footprint-map .leaflet-tooltip.footprint-number{display:flex;align-items:center;justify-content:center;width:26px;height:26px;margin:0!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;color:var(--ink);font-weight:900;font-size:13px;line-height:1;pointer-events:none}
+.footprint-map .leaflet-tooltip.footprint-number::before{display:none!important}
+.footprint-map .leaflet-popup-content-wrapper{border:2px solid var(--ink);border-radius:10px;box-shadow:4px 4px 0 var(--ink);background:var(--paper)}
+.footprint-map .leaflet-popup-tip{background:var(--paper)}
+.footprint-popup{display:grid;gap:3px;min-width:150px}.footprint-popup b{font-size:15px}.footprint-popup small,.footprint-popup span{display:block;color:#64706d;font-size:11px}
+.footprint-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+.footprint-legend button.selected{outline:4px solid color-mix(in srgb,var(--primary) 65%,white);outline-offset:-4px;background:color-mix(in srgb,var(--primary) 16%,var(--paper))}
+@media(max-width:560px){.footprint-map-card header{align-items:flex-start}.footprint-actions .btn{padding:8px 10px;font-size:13px}.footprint-map{height:360px}}
+
+
+/* =========================================================
+   v3.6.0 Atlas Alpha — first-version map engine migration
+   ========================================================= */
+.atlas-map-wrap{position:absolute;inset:0;isolation:isolate}
+.atlas-map,.atlas-map.leaflet-container{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;background:#e9efed;z-index:1}
+.atlas-map .leaflet-tile{max-width:none!important;max-height:none!important;width:256px!important;height:256px!important;padding:0!important;margin:0!important;border:0!important;box-shadow:none!important}
+.atlas-map .leaflet-pane svg,.atlas-map .leaflet-pane canvas{max-width:none!important;max-height:none!important}
+.atlas-marker-shell{background:transparent!important;border:0!important}
+.atlas-marker{display:grid;place-items:center;width:34px;height:34px;border:3px solid var(--ink);border-radius:50% 50% 50% 8px;transform:rotate(-45deg);background:var(--paper);box-shadow:2px 2px 0 var(--ink);font-size:12px;font-weight:900;color:var(--ink)}
+.atlas-marker::before{content:'';position:absolute;inset:0;border-radius:inherit}
+.atlas-marker-shell .atlas-marker{position:relative}
+.atlas-marker-shell .atlas-marker>*{transform:rotate(45deg)}
+.atlas-marker{line-height:1;text-indent:0}
+.atlas-marker.start{background:#8fd17f}.atlas-marker.end{background:#ef8d91}.atlas-marker.completed{background:#8fd17f}.atlas-marker.selected{outline:5px solid color-mix(in srgb,var(--primary) 65%,white);outline-offset:2px}.atlas-marker.hidden{opacity:.25}
+.atlas-marker-shell .atlas-marker{font-size:0}.atlas-marker-shell .atlas-marker::after{content:attr(data-label);font-size:12px;transform:rotate(45deg)}
+.atlas-popup{display:grid;gap:4px;min-width:160px}.atlas-popup b{font-size:15px}.atlas-popup small,.atlas-popup span{display:block;color:#64706d;font-size:11px}
+.atlas-locate{position:absolute;right:10px;top:10px;z-index:600;border:2px solid var(--ink);border-radius:9px;background:var(--paper);padding:8px 10px;box-shadow:2px 2px 0 var(--ink);font:inherit;font-size:12px;font-weight:800}
+.atlas-locate:disabled{opacity:.65}
+.footprint-map>svg,.footprint-map>.footprint-route-overlay,.footprint-map>.footprint-map-tiles{display:none!important}
+.atlas-marker>span{display:block;transform:rotate(45deg);font-size:12px}

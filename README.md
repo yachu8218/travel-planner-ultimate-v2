@@ -1,5 +1,12 @@
-# Travel Planner Ultimate v3.6.0
+# Travel Planner Ultimate v3.6.0 Atlas Alpha 1
 
-回憶足跡地圖已完整重寫。地圖、景點與路線全部由 Leaflet 使用同一套經緯度座標管理，並新增定位校正。
+第一階段已把第一版穩定的 Leaflet 地圖流程移植到新版回憶頁。
 
-部署到 Cloudflare Pages 後，請確認環境變數 `GOOGLE_PLACES_API_KEY` 已設定，才能使用「校正定位」。
+- OpenStreetMap 原生圖磚
+- Leaflet Marker / Polyline / fitBounds
+- 不使用 Canvas 圓形標記或自行換算 XY
+- 起點、終點、中途站標記
+- 清單選取與地圖 flyTo
+- 我的定位
+
+本版為 Atlas Alpha 測試版，先驗證地圖顯示與定位。

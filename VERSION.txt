@@ -1,9 +1,9 @@
 Travel Planner Ultimate
-Version: 3.6.0 — Footprint Map Rewrite
+Version: 3.6.0 Atlas Alpha 1
+Code Name: Atlas
+Update: First-version map engine migration
 
-- 重寫 Leaflet 足跡地圖
-- 使用 CircleMarker，避免預設圖示或圖片樣式衝突
-- 精準經緯度標記與 Polyline 路線
-- 點選清單可定位景點
-- 新增 Google Places 定位校正
-- 保留每日／整趟旅行及回放功能
+- Uses the first version Leaflet architecture
+- Removes Canvas/SVG coordinate overlays
+- Native Marker, Polyline and fitBounds
+- Adds current-location control
