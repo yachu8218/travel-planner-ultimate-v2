@@ -1,5 +1,5 @@
 Travel Planner Ultimate
-Version: 3.6.0 Atlas Debug 1
+Version: 3.6.0 Atlas Debug 2
 
 Purpose:
 - Isolate the blue/yellow block in the Memories map.

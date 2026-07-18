@@ -2171,3 +2171,16 @@ form select{
 .atlas-map .leaflet-overlay-pane svg,
 .atlas-map .leaflet-overlay-pane canvas{display:none!important;visibility:hidden!important;width:0!important;height:0!important}
 .atlas-map svg,.atlas-map canvas{max-width:none!important;max-height:none!important}
+
+/* =========================================================
+   Atlas Debug 2 — rogue image / shadow isolation
+   The blue-yellow rectangle persists with overlay panes off,
+   so hide every non-tile image and every shadow pane inside
+   this map only. Leaflet map tiles, div markers and popups stay.
+   ========================================================= */
+.atlas-map .leaflet-shadow-pane,
+.atlas-map .leaflet-marker-shadow{display:none!important;visibility:hidden!important}
+.atlas-map img:not(.leaflet-tile){display:none!important;visibility:hidden!important;width:0!important;height:0!important;max-width:0!important;max-height:0!important}
+.atlas-map .leaflet-tile-pane,
+.atlas-map .leaflet-tile-container,
+.atlas-map .leaflet-tile{opacity:1!important;filter:none!important;background:transparent!important}
