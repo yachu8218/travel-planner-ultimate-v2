@@ -1,8 +1,2 @@
-Travel Planner Ultimate v3.6.1.1
-Memories Popup UI refinement
-- Smaller popup cards on mobile
-- Reduced typography and spacing
-- Address limited to 2 lines
-- Notes limited to 3 lines
-- Internal scrolling for long content
-- Map core, markers, routes, location and synchronization unchanged
+Travel Planner Ultimate v3.6.2
+Journey Map 第二階段：Day 篩選、類型篩選、自動 Fit Route、完整旅程時間軸與地圖同步。

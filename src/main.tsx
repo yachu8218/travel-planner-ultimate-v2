@@ -1505,32 +1505,53 @@ function TransportDetails({item}:{item:Item}){
 }
 
 
+type JourneyCategory='all'|'food'|'cafe'|'attraction'|'shopping'|'hotel'|'airport'|'station'|'transport'|'other'
+
+const atlasCategoryForItem=(item:Item):Exclude<JourneyCategory,'all'>=>{
+ const category=placeCategory(item)
+ const primary=(item.primaryType||'').toLowerCase()
+ if(item.type==='meal')return primary.includes('cafe')||primary.includes('coffee')?'cafe':'food'
+ if(item.type==='hotel')return 'hotel'
+ if(item.type==='flight')return 'airport'
+ if(item.type==='transport')return item.transportMode==='train'||item.transportMode==='metro'?'station':'transport'
+ if(category.label==='購物')return 'shopping'
+ if(category.label==='景點')return 'attraction'
+ return 'other'
+}
+
+const journeyCategoryVisual:Record<Exclude<JourneyCategory,'all'>,{emoji:string;label:string}>={
+ food:{emoji:'🍜',label:'美食'},cafe:{emoji:'☕',label:'咖啡'},attraction:{emoji:'🏛️',label:'景點'},
+ shopping:{emoji:'🛍️',label:'購物'},hotel:{emoji:'🏨',label:'住宿'},airport:{emoji:'✈️',label:'航班'},
+ station:{emoji:'🚉',label:'車站'},transport:{emoji:'🚇',label:'交通'},other:{emoji:'📍',label:'其他'}
+}
+
 function FootprintLeafletMap({points,replayIndex,selectedId,onSelect}:{
  points:{day:Day;item:Item;lat:number;lon:number;index:number}[];
  replayIndex:number;selectedId:string|null;onSelect:(id:string)=>void
 }){
  return <AtlasMap points={points.map(point=>{
   const category=placeCategory(point.item)
-  const type=point.item.type
-  const primary=(point.item.primaryType||'').toLowerCase()
-  const atlasCategory=type==='meal'?(primary.includes('cafe')||primary.includes('coffee')?'cafe':'food'):type==='hotel'?'hotel':type==='flight'?'airport':type==='transport'?(point.item.transportMode==='train'||point.item.transportMode==='metro'?'station':'transport'):category.label==='購物'?'shopping':category.label==='景點'?'attraction':'other'
-  return {id:point.item.id,title:point.item.title,address:point.item.address,note:point.item.note,date:point.day.date,time:point.item.start,lat:point.lat,lon:point.lon,index:point.index,completed:point.item.completed,rating:point.item.rating,category:atlasCategory,categoryLabel:category.label}
+  return {id:point.item.id,title:point.item.title,address:point.item.address,note:point.item.note,date:point.day.date,time:point.item.start,lat:point.lat,lon:point.lon,index:point.index,completed:point.item.completed,rating:point.item.rating,category:atlasCategoryForItem(point.item),categoryLabel:category.label}
  })} selectedId={selectedId} replayIndex={replayIndex} onSelect={id=>onSelect(selectedId===id?'':id)}/>
 }
 
 
 function MemoriesCenter({trip,readOnly,onToggle,onSaveMemory,onCalibrate}:{trip:Trip;readOnly:boolean;onToggle:(dayId:string,itemId:string)=>void;onSaveMemory:(dayId:string,memory:DayMemory)=>void;onCalibrate:(points:{day:Day;item:Item}[])=>Promise<void>}){
  const [selectedDay,setSelectedDay]=useState<string>('all')
+ const [selectedCategory,setSelectedCategory]=useState<JourneyCategory>('all')
  const [replayIndex,setReplayIndex]=useState(-1)
  const [draft,setDraft]=useState<DayMemory>({note:'',rating:5,photos:[]})
  const [selectedPointId,setSelectedPointId]=useState<string|null>(null)
  const [calibrating,setCalibrating]=useState(false)
  const days=selectedDay==='all'?trip.days:trip.days.filter(day=>day.id===selectedDay)
- const points=days.flatMap(day=>day.items.filter(item=>item.lat!=null&&item.lon!=null).map(item=>({day,item,lat:Number(item.lat),lon:Number(item.lon)})))
+ const journeyEvents=days.flatMap(day=>day.items.map((item,itemIndex)=>({day,dayIndex:trip.days.findIndex(sourceDay=>sourceDay.id===day.id),item,itemIndex,category:atlasCategoryForItem(item)})))
+ const filteredEvents=selectedCategory==='all'?journeyEvents:journeyEvents.filter(event=>event.category===selectedCategory)
+ const points=filteredEvents.filter(event=>event.item.lat!=null&&event.item.lon!=null).map(event=>({day:event.day,item:event.item,lat:Number(event.item.lat),lon:Number(event.item.lon)}))
  const mapped=points.map((point,index)=>({...point,index}))
  const selected=selectedDay==='all'?null:trip.days.find(day=>day.id===selectedDay)
  const memory=selected?(trip.memories?.[selected.id]||{note:'',rating:5,photos:[]}):null
  useEffect(()=>{if(memory)setDraft({...memory,photos:[...(memory.photos||[])]})},[selectedDay])
+ useEffect(()=>{if(selectedPointId&&!mapped.some(point=>point.item.id===selectedPointId))setSelectedPointId(null)},[selectedDay,selectedCategory,mapped.length])
  useEffect(()=>{
   if(replayIndex<0)return
   if(replayIndex>=mapped.length){setReplayIndex(-1);return}
@@ -1565,14 +1586,29 @@ function MemoriesCenter({trip,readOnly,onToggle,onSaveMemory,onCalibrate}:{trip:
    <button className={selectedDay==='all'?'active':''} onClick={()=>setSelectedDay('all')}>整趟旅行</button>
    {trip.days.map((day,index)=><button key={day.id} className={selectedDay===day.id?'active':''} onClick={()=>setSelectedDay(day.id)}>Day {index+1}</button>)}
   </div>
+  <div className="memory-category-tabs" aria-label="旅程類型篩選">
+   <button className={selectedCategory==='all'?'active':''} onClick={()=>setSelectedCategory('all')}>全部</button>
+   {(Object.entries(journeyCategoryVisual) as [Exclude<JourneyCategory,'all'>,{emoji:string;label:string}][]).map(([key,visual])=><button key={key} className={selectedCategory===key?'active':''} onClick={()=>setSelectedCategory(key)}><span>{visual.emoji}</span>{visual.label}</button>)}
+  </div>
   <article className="card footprint-map-card">
    <header><div><small>FOOTPRINT MAP</small><h3>{selectedDay==='all'?'完整旅行路線':selected?.title}</h3></div><div className="footprint-actions">{!readOnly&&<button className="btn" disabled={calibrating||!days.some(day=>day.items.some(item=>item.type==='place'||item.type==='meal'||item.type==='hotel'))} onClick={async()=>{setCalibrating(true);try{await onCalibrate(days.flatMap(day=>day.items.map(item=>({day,item}))))}finally{setCalibrating(false)}}}>{calibrating?'定位校正中…':'校正定位'}</button>}<button className="btn yellow" disabled={!mapped.length||replayIndex>=0} onClick={()=>setReplayIndex(0)}>▶ 回放</button></div></header>
    <div className="footprint-map">
     {mapped.length>0?<FootprintLeafletMap points={mapped} replayIndex={replayIndex} selectedId={selectedPointId} onSelect={setSelectedPointId}/>:<div className="memory-map-empty">行程地點需要有經緯度，才會顯示地圖與足跡路線。</div>}
    </div>
-   <div className="footprint-legend">{mapped.map(point=><button key={point.item.id} className={`${point.item.completed?'completed':''} ${selectedPointId===point.item.id?'selected':''}`} onClick={()=>setSelectedPointId(point.item.id)} onDoubleClick={()=>!readOnly&&onToggle(point.day.id,point.item.id)}>
-    <span>{point.item.completed?'✓':point.index+1}</span><div><b>{point.item.title}</b><small>{point.day.date}・{point.item.start||'未設定時間'}</small></div>
-   </button>)}</div>
+   <section className="journey-timeline" aria-label="旅程時間軸">
+    <header><div><small>JOURNEY TIMELINE</small><h3>完整旅程記錄</h3></div><span>{filteredEvents.length} 個事件</span></header>
+    <div className="journey-timeline-list">{filteredEvents.map((event,eventIndex)=>{
+     const visual=journeyCategoryVisual[event.category]
+     const hasMap=event.item.lat!=null&&event.item.lon!=null
+     const routeText=(event.item.type==='flight'||event.item.type==='transport')&&(event.item.from||event.item.to)?`${event.item.from||'出發地'} → ${event.item.to||'抵達地'}`:''
+     return <button key={event.item.id} className={`journey-event ${event.item.completed?'completed':''} ${selectedPointId===event.item.id?'selected':''} ${hasMap?'has-map':'no-map'}`} onClick={()=>hasMap&&setSelectedPointId(event.item.id)} onDoubleClick={()=>!readOnly&&onToggle(event.day.id,event.item.id)}>
+      <span className="journey-event-time">{event.item.start||'--:--'}</span>
+      <span className="journey-event-node">{event.item.completed?'✓':visual.emoji}</span>
+      <div><b>{event.item.title}</b><small>Day {event.dayIndex+1}・{event.day.date}・{visual.label}</small>{routeText&&<em>{routeText}</em>}{!hasMap&&<i>此事件尚無地圖座標</i>}</div>
+      <span className="journey-event-index">{eventIndex+1}</span>
+     </button>
+    })}</div>
+   </section>
   </article>
   <section className="memory-stats">
    {[['📍','景點',stats.places],['🍽️','餐飲',stats.meals],['🚇','交通',stats.transport],['✈️','航班',stats.flights],['✅','已完成',stats.completed],['🛣️','紀錄距離',`${stats.distance} km`]].map(([icon,label,value])=><article className="card" key={String(label)}><span>{icon}</span><b>{value}</b><small>{label}</small></article>)}
