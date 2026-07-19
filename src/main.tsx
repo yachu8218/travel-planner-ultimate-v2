@@ -1509,7 +1509,13 @@ function FootprintLeafletMap({points,replayIndex,selectedId,onSelect}:{
  points:{day:Day;item:Item;lat:number;lon:number;index:number}[];
  replayIndex:number;selectedId:string|null;onSelect:(id:string)=>void
 }){
- return <AtlasMap points={points.map(point=>({id:point.item.id,title:point.item.title,address:point.item.address,date:point.day.date,time:point.item.start,lat:point.lat,lon:point.lon,index:point.index,completed:point.item.completed}))} selectedId={selectedId} replayIndex={replayIndex} onSelect={onSelect}/>
+ return <AtlasMap points={points.map(point=>{
+  const category=placeCategory(point.item)
+  const type=point.item.type
+  const primary=(point.item.primaryType||'').toLowerCase()
+  const atlasCategory=type==='meal'?(primary.includes('cafe')||primary.includes('coffee')?'cafe':'food'):type==='hotel'?'hotel':type==='flight'?'airport':type==='transport'?(point.item.transportMode==='train'||point.item.transportMode==='metro'?'station':'transport'):category.label==='購物'?'shopping':category.label==='景點'?'attraction':'other'
+  return {id:point.item.id,title:point.item.title,address:point.item.address,note:point.item.note,date:point.day.date,time:point.item.start,lat:point.lat,lon:point.lon,index:point.index,completed:point.item.completed,rating:point.item.rating,category:atlasCategory,categoryLabel:category.label}
+ })} selectedId={selectedId} replayIndex={replayIndex} onSelect={id=>onSelect(selectedId===id?'':id)}/>
 }
 
 
